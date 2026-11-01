@@ -1760,15 +1760,6 @@
                 showToast("Error al trazar nuevo punto");
             }
         },
-                    const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${newStId}"]`);
-                    if (nodeEl) nodeEl.classList.add("connect-source");
-                    showToast(`Estación ${newName} creada. Haz clic en el siguiente punto para unir.`);
-                }
-            } catch (err) {
-                console.error("Error creando estación al trazar:", err);
-                showToast("Error al trazar nuevo punto");
-            }
-        },
 
         handleStationClickForCorrespondence(stId) {
             const st = NetworkStore.stationsById.get(stId);
@@ -2989,7 +2980,7 @@
                                 fill="#FFFFFF" stroke="${outerStroke}" stroke-width="${strokeW}"${dashAttr} />
                             <circle cx="${st.x}" cy="${st.y}" r="${innerR}"
                                 fill="${fill}" stroke="${innerStroke}" stroke-width="1.8" />
-                            <title>${escapeHtml(st.name)} · Nodo de Correspondencia (${st.lines.join(", ")})${orphanHint}</title>
+                            <title>${escapeHtml(st.name)} · Nodo de Correspondencia (${(Array.isArray(st.lines) ? st.lines : []).join(", ")})${orphanHint}</title>
                         </g>
                     `;
                 } else if (onlyBrt) {
@@ -6515,14 +6506,14 @@
             }
 
             if (listContainer) {
-                const transferStations = NetworkStore.stations.filter(s => s.is_transfer || s.lines.length > 1);
+                const transferStations = NetworkStore.stations.filter(s => s.is_transfer || (Array.isArray(s.lines) && s.lines.length > 1));
                 listContainer.innerHTML = transferStations.map(s => `
                     <div class="corr-station-chip" data-station-id="${s.id}">
                         <div class="station-name-link js-select-corr-st" style="cursor:pointer; font-weight:600;" data-station-id="${s.id}">
                             ${escapeHtml(s.name)}
                         </div>
                         <div class="corr-lines-badges">
-                            ${s.lines.map(c => {
+                            ${(Array.isArray(s.lines) ? s.lines : []).map(c => {
                                 const ln = NetworkStore.linesByCode.get(c);
                                 const bg = ln ? ln.color : "#475569";
                                 const fg = getBadgeTextColor(bg, "#FFFFFF");

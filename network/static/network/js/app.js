@@ -1015,7 +1015,7 @@
             document.getElementById("edToolActiveStatus")?.classList.add("hidden");
         },
 
-        openNewStationModal(x = null, y = null) {
+        openNewStationModal(x = null, y = null, initialLine = null) {
             const modal = document.getElementById("modalNewStation");
             if (!modal) return;
             const inputX = document.getElementById("newStationX");
@@ -1047,12 +1047,16 @@
 
             if (selectLine) {
                 const curEditLine = document.getElementById("editLineSelect")?.value;
-                const chosenLine = NetworkStore.isolatedLineCode || curEditLine || "";
+                const chosenLine = initialLine || NetworkStore.isolatedLineCode || curEditLine || "";
                 selectLine.innerHTML = '<option value="">(Ninguna: estación independiente / huérfana)</option>' +
                     NetworkStore.lines.map(l =>
                         `<option value="${escapeHtml(l.code)}" ${chosenLine === l.code ? "selected" : ""}>Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
                     ).join("");
+                if (chosenLine) {
+                    selectLine.value = chosenLine;
+                }
             }
+
             modal.classList.remove("hidden");
         },
 
@@ -1382,7 +1386,8 @@
                 const lineCode = trackHit.dataset.lineCode;
                 const s1Id = Number(trackHit.dataset.s1Id);
                 const s2Id = Number(trackHit.dataset.s2Id);
-                this.renderTrackMenu(e.clientX, e.clientY, lineCode, s1Id, s2Id);
+                const svgPt = SchematicMapEngine.clientToSvgCoords(e.clientX, e.clientY);
+                this.renderTrackMenu(e.clientX, e.clientY, lineCode, s1Id, s2Id, svgPt.x, svgPt.y);
                 return;
             }
 
@@ -1417,6 +1422,9 @@
 
             const html = `
                 <div class="context-menu-header">Estación: ${escapeHtml(st.name)}</div>
+                <button type="button" class="ctx-item js-ctx-create-station-near" data-station-id="${st.id}">
+                    <span>＋</span> <span>Crear Estación (Create Station)</span>
+                </button>
                 <button type="button" class="ctx-item js-ctx-connect-segment" data-station-id="${st.id}">
                     <span>⚡</span> <span>Conectar Trazo a otra Estación</span>
                 </button>
@@ -1438,6 +1446,12 @@
         },
 
         bindStationMenuEvents(st) {
+            this.el.querySelector(".js-ctx-create-station-near")?.addEventListener("click", () => {
+                this.hide();
+                const defaultLine = Array.isArray(st.lines) && st.lines.length > 0 ? st.lines[0] : null;
+                VisualEditorTools.openNewStationModal(st.x + 40, st.y + 40, defaultLine);
+            });
+
             this.el.querySelector(".js-ctx-connect-segment")?.addEventListener("click", () => {
                 this.hide();
                 VisualEditorTools.openNewSegmentModal(st.id);
@@ -1470,28 +1484,37 @@
             });
         },
 
-        renderTrackMenu(clientX, clientY, lineCode, s1Id, s2Id) {
+        renderTrackMenu(clientX, clientY, lineCode, s1Id, s2Id, svgX = null, svgY = null) {
             const st1 = NetworkStore.stationsById.get(s1Id);
             const st2 = NetworkStore.stationsById.get(s2Id);
             const s1Name = st1 ? st1.name : "Estación 1";
             const s2Name = st2 ? st2.name : "Estación 2";
+            const posX = svgX != null ? Math.round(Number(svgX) * 2) / 2 : 2120;
+            const posY = svgY != null ? Math.round(Number(svgY) * 2) / 2 : 1860;
 
             const html = `
                 <div class="context-menu-header">Tramo: Línea ${escapeHtml(lineCode)}</div>
                 <div style="padding:3px 12px 6px; font-size:11px; color:#475569;">${escapeHtml(s1Name)} ↔ ${escapeHtml(s2Name)}</div>
                 <div class="ctx-divider"></div>
+                <button type="button" class="ctx-item js-ctx-create-station-track" data-line-code="${escapeHtml(lineCode)}">
+                    <span>＋</span> <span>Crear Estación en esta Línea (Create Station)</span>
+                </button>
+                <button type="button" class="ctx-item js-ctx-new-segment-here" data-s1="${s1Id}">
+                    <span>⚡</span> <span>Conectar Tramo desde ${escapeHtml(s1Name)}</span>
+                </button>
                 <button type="button" class="ctx-item js-ctx-straighten-line" data-line-code="${escapeHtml(lineCode)}">
                     <span>⎯</span> <span>Enderezar Trazos Línea (90° / 180°)</span>
                 </button>
                 <button type="button" class="ctx-item js-ctx-isolate-line" data-line-code="${escapeHtml(lineCode)}">
                     <span>🔍</span> <span>Aislar esta Línea</span>
                 </button>
-                <button type="button" class="ctx-item js-ctx-new-segment-here" data-s1="${s1Id}">
-                    <span>⚡</span> <span>Conectar Tramo desde ${escapeHtml(s1Name)}</span>
-                </button>
             `;
 
             this.show(clientX, clientY, html);
+            this.el.querySelector(".js-ctx-create-station-track")?.addEventListener("click", () => {
+                this.hide();
+                VisualEditorTools.openNewStationModal(posX, posY, lineCode);
+            });
             this.el.querySelector(".js-ctx-straighten-line")?.addEventListener("click", async () => {
                 this.hide();
                 await ControlCenterUI.straightenLineTracks(lineCode);
@@ -1515,7 +1538,7 @@
             const html = `
                 <div class="context-menu-header">Mapa (${posX.toFixed(1)}, ${posY.toFixed(1)})</div>
                 <button type="button" class="ctx-item js-ctx-add-station">
-                    <span>＋</span> <span>Agregar Estación Aquí</span>
+                    <span>＋</span> <span>Crear Estación Aquí (Create Station)</span>
                 </button>
                 <button type="button" class="ctx-item js-ctx-create-line">
                     <span>＋</span> <span>Crear Línea Nueva</span>

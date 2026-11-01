@@ -743,13 +743,16 @@
                 <!-- Sub-panel Editor de Correspondencias y Transbordos -->
                 <div id="sectionEditCorrespondence" class="editor-form hidden">
                     <form id="formEditCorrespondence">
-                        <div class="form-group">
-                            <label for="corrStationSelect">Estación a Conectar como Correspondencia</label>
-                            <select id="corrStationSelect" class="form-control" required></select>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                                <span class="form-hint" id="corrStationCurrentLinesText">Líneas actuales: -</span>
+                        <input type="hidden" id="corrStationSelect" value="">
+                        <div class="corr-selected-station-card" style="padding:10px 12px; background:var(--bg-secondary, #f8fafc); border:1px solid var(--border-color, #e2e8f0); border-radius:8px; margin-bottom:12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <span style="font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary, #64748b);">Estación Seleccionada en Mapa</span>
+                                    <div id="corrSelectedStationName" style="font-size:14.5px; font-weight:700; color:var(--text-primary, #0f172a); margin-top:2px;">Haz clic en una estación del mapa</div>
+                                </div>
                                 <span id="corrCapacityBadge" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; background:#e2e8f0; color:#334155;">0/10 líneas</span>
                             </div>
+                            <span class="form-hint" id="corrStationCurrentLinesText" style="margin-top:4px; display:block;">Líneas actuales: -</span>
                         </div>
                         <div class="form-group">
                             <label for="corrTargetLineSelect">Línea Destino de la Correspondencia</label>

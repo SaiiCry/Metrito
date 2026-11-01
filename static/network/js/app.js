@@ -4335,9 +4335,13 @@
 
             // Sincronizar selección en formularios de edición si el panel editor está abierto
             const corrStationSel = document.getElementById("corrStationSelect");
+            const corrNameEl = document.getElementById("corrSelectedStationName");
             if (corrStationSel && corrStationSel.value !== String(stationId)) {
                 corrStationSel.value = String(stationId);
                 this.updateTargetLinesForStation(stationId);
+            }
+            if (corrNameEl && st) {
+                corrNameEl.textContent = st.name;
             }
             const edStationId = document.getElementById("editStationId");
             if (edStationId && edStationId.value !== String(stationId)) {
@@ -6161,7 +6165,7 @@
                 const stVal = document.getElementById("corrStationSelect")?.value;
                 const stId = parseInt(stVal);
                 if (!stId) {
-                    showToast("Elige una estación existente para la correspondencia");
+                    showToast("Haz clic en una estación en el mapa para conectar correspondencia");
                     return;
                 }
                 const checkedCbs = Array.from(document.querySelectorAll("#corrTargetLinesChecklist .js-corr-line-checkbox:checked"));
@@ -6297,49 +6301,46 @@
         updateCorrespondenceSelectedStation(st) {
             const corrStationSel = document.getElementById("corrStationSelect");
             const modalCorrSel = document.getElementById("modalCorrStationSelect");
+            const nameEl = document.getElementById("corrSelectedStationName");
             if (st) {
-                if (corrStationSel && corrStationSel.value !== String(st.id)) {
-                    corrStationSel.value = String(st.id);
-                }
+                if (corrStationSel) corrStationSel.value = String(st.id);
+                if (nameEl) nameEl.textContent = st.name;
                 if (modalCorrSel && modalCorrSel.value !== String(st.id)) {
                     modalCorrSel.value = String(st.id);
                 }
                 this.updateTargetLinesForStation(st.id);
+            } else {
+                if (corrStationSel) corrStationSel.value = "";
+                if (nameEl) nameEl.textContent = "Haz clic en una estación del mapa";
             }
         },
 
         populateCorrespondenceSubtab() {
             const selStation = document.getElementById("corrStationSelect");
             const listContainer = document.getElementById("corrStationsList");
+            const nameEl = document.getElementById("corrSelectedStationName");
 
-            const sorted = NetworkStore.getSortedStations();
+            const initialId = NetworkStore.selectedStationId;
+            const currentSt = initialId ? NetworkStore.stationsById.get(initialId) : null;
+
             if (selStation) {
-                selStation.innerHTML = sorted.map(s => {
-                    const lList = Array.isArray(s.lines) && s.lines.length > 0 ? ` (Líneas: ${s.lines.join("/")})` : "";
-                    return `<option value="${s.id}">${escapeHtml(s.name)}${escapeHtml(lList)}</option>`;
-                }).join("");
-
-                const initialId = NetworkStore.selectedStationId || (sorted.length > 0 ? sorted[0].id : null);
-                if (initialId) {
-                    selStation.value = String(initialId);
-                    this.updateTargetLinesForStation(initialId);
+                if (selStation.tagName === "SELECT") {
+                    const sorted = NetworkStore.getSortedStations();
+                    selStation.innerHTML = sorted.map(s => {
+                        const lList = Array.isArray(s.lines) && s.lines.length > 0 ? ` (Líneas: ${s.lines.join("/")})` : "";
+                        return `<option value="${s.id}">${escapeHtml(s.name)}${escapeHtml(lList)}</option>`;
+                    }).join("");
+                    if (initialId) selStation.value = String(initialId);
+                } else {
+                    selStation.value = initialId ? String(initialId) : "";
                 }
+            }
 
-                if (!selStation.dataset.boundChange) {
-                    selStation.dataset.boundChange = "true";
-                    const handleStationChange = (e) => {
-                        const stId = Number(e.target.value);
-                        if (stId) {
-                            NetworkStore.selectedStationId = stId;
-                            if (SchematicMapEngine.updateStationSelectionUI) {
-                                SchematicMapEngine.updateStationSelectionUI(null, stId);
-                            }
-                            this.updateTargetLinesForStation(stId);
-                        }
-                    };
-                    selStation.addEventListener("change", handleStationChange);
-                    selStation.addEventListener("input", handleStationChange);
-                }
+            if (currentSt) {
+                if (nameEl) nameEl.textContent = currentSt.name;
+                this.updateTargetLinesForStation(currentSt.id);
+            } else if (nameEl) {
+                nameEl.textContent = "Haz clic en una estación del mapa";
             }
 
             if (listContainer) {

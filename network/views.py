@@ -123,6 +123,7 @@ def api_network_data(request):
             "icon_tags": [t for t in (s.icon_tags or []) if t in ALLOWED_ICON_TAGS],
             "terminal_lines": s.terminal_lines if isinstance(s.terminal_lines, list) else [],
             "lines": station_served_lines.get(s.id, []),
+            "custom_color": s.custom_color or "",
             "is_user_created": s.is_user_created,
             "is_custom_modified": s.is_custom_modified,
         }
@@ -398,6 +399,32 @@ def api_update_station(request, station_id):
     if "is_transfer" in payload:
         station.is_transfer = bool(payload["is_transfer"])
 
+    if "custom_color" in payload:
+        station.custom_color = str(payload["custom_color"]).strip()
+
+    if "primary_line" in payload:
+        target_line = str(payload.get("primary_line") or "").strip()
+        if target_line:
+            target_line_obj = TransitLine.objects.filter(code=target_line).first()
+            if target_line_obj:
+                ls_exists = LineStation.objects.filter(station=station, line=target_line_obj).exists()
+                if not ls_exists:
+                    max_seq = LineStation.objects.filter(line=target_line_obj).count()
+                    LineStation.objects.create(
+                        line=target_line_obj,
+                        station=station,
+                        sequence=max_seq + 1,
+                        branch="main",
+                        segment_infrastructure=station.infrastructure_type,
+                        segment_status=station.operational_status,
+                        depth_meters=station.depth_meters,
+                    )
+        elif target_line == "":
+            LineStation.objects.filter(station=station).delete()
+            station.is_transfer = False
+            station.is_terminal = False
+            station.terminal_lines = []
+
     station.is_custom_modified = True
     station.save()
 
@@ -427,6 +454,7 @@ def api_update_station(request, station_id):
                 "icon_tags": station.icon_tags,
                 "terminal_lines": station.terminal_lines,
                 "is_terminal": station.is_terminal,
+                "custom_color": station.custom_color,
             },
         }
     )

@@ -527,6 +527,7 @@ def export_user_network_layer(deleted_station_code: str = None, deleted_station_
             "is_premium_stop": s.is_premium_stop,
             "icon_tags": s.icon_tags,
             "terminal_lines": s.terminal_lines,
+            "custom_color": s.custom_color or "",
             "is_user_created": True,
             "is_custom_modified": s.is_custom_modified,
         })
@@ -551,6 +552,7 @@ def export_user_network_layer(deleted_station_code: str = None, deleted_station_
             "is_premium_stop": s.is_premium_stop,
             "icon_tags": s.icon_tags,
             "terminal_lines": s.terminal_lines,
+            "custom_color": s.custom_color or "",
         })
 
     created_lines = []
@@ -710,6 +712,7 @@ def apply_user_network_layer(layer_data: Dict[str, Any] = None) -> Dict[str, Any
                     "is_premium_stop": bool(s_data.get("is_premium_stop", False)),
                     "icon_tags": s_data.get("icon_tags", []),
                     "terminal_lines": s_data.get("terminal_lines", []),
+                    "custom_color": s_data.get("custom_color", ""),
                     "is_user_created": True,
                     "is_custom_modified": bool(s_data.get("is_custom_modified", False)),
                 }
@@ -722,7 +725,7 @@ def apply_user_network_layer(layer_data: Dict[str, Any] = None) -> Dict[str, Any
             if st:
                 for k in ["name", "x", "y", "lat", "lng", "infrastructure_type", "operational_status",
                           "depth_meters", "platform_type", "platform_count", "has_psd", "is_transfer",
-                          "is_terminal", "is_premium_stop", "icon_tags", "terminal_lines"]:
+                          "is_terminal", "is_premium_stop", "icon_tags", "terminal_lines", "custom_color"]:
                     if k in s_data:
                         setattr(st, k, s_data[k])
                 st.is_custom_modified = True

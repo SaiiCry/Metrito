@@ -637,6 +637,23 @@
                         <label for="editStationName">Nombre de la Estación</label>
                         <input type="text" id="editStationName" class="form-control" required>
                     </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="editStationPrimaryLine">Línea Asignada / Principal</label>
+                            <select id="editStationPrimaryLine" class="form-control">
+                                <option value="">(Sin línea / Independiente)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editStationCustomColor">Color de Estación</label>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <input type="color" id="editStationCustomColor" class="form-control color-swatch" style="width:44px; padding:2px; height:34px; cursor:pointer;" value="#0055A4">
+                                <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; margin:0; color:#475569;">
+                                    <input type="checkbox" id="editStationCustomColorActive"> Personalizado
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label>Terminal de Línea (Icono con Número al Lado)</label>
                         <div id="editStationTerminalsGroup">

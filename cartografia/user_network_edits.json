@@ -2,7 +2,7 @@
   "version": 1,
   "created_stations": [
     {
-      "code": "estacion-u-fd69bbcc",
+      "code": "estacion-u-a352cf15",
       "name": "Estación Ficticia Parque Oriente",
       "x": 3200.0,
       "y": 1500.0,
@@ -19,6 +19,7 @@
       "is_premium_stop": false,
       "icon_tags": [],
       "terminal_lines": [],
+      "custom_color": "",
       "is_user_created": true,
       "is_custom_modified": false
     }

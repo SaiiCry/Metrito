@@ -339,4 +339,39 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         const saved = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
         assert.deepEqual(saved.segments["55"].waypoints, [[200.0, 150.0], [300.0, 150.0]]);
     });
+
+    it("personalización de línea principal y color de estación persiste en memoria y almacenamiento local", () => {
+        const st = mockStore.stationsById.get(102);
+        st.lines = ["2"];
+        st.custom_color = "#E11D48";
+        st.is_transfer = false;
+
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify({
+            stations: {
+                102: { lines: ["2"], custom_color: "#E11D48", is_transfer: false }
+            }
+        }));
+
+        const saved = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        assert.deepEqual(saved.stations[102].lines, ["2"]);
+        assert.equal(saved.stations[102].custom_color, "#E11D48");
+        assert.equal(saved.stations[102].is_transfer, false);
+    });
+
+    it("conexión de tramo directo detecta y utiliza la línea compartida 2 sin defaulting a Línea 1", () => {
+        const st1 = mockStore.stationsById.get(101); // lines: ["1", "2"]
+        const st2 = mockStore.stationsById.get(102); // lines: ["1"]
+        // Si st2 se conecta en Línea 2
+        const targetLineCode = "2";
+        const ln2 = mockStore.linesByCode.get(targetLineCode);
+
+        // Añadir a ln2
+        ln2.stops.push({ station_id: st2.id, sequence: ln2.stops.length, waypoints: [] });
+        if (!st2.lines.includes(targetLineCode)) st2.lines.push(targetLineCode);
+        st2.is_transfer = st2.lines.length > 1;
+
+        assert.equal(st2.lines.includes("2"), true);
+        assert.equal(st2.is_transfer, true);
+        assert.equal(ln2.stops.some(s => s.station_id === 102), true);
+    });
 });

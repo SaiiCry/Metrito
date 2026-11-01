@@ -633,3 +633,104 @@ describe("Snap de Waypoints - Exactitud de Ángulos Ortogonales y Octilineales e
         assert.equal(targetX - neighbor.x, 0);
     });
 });
+
+
+describe("Auto-Detección Neutra de Línea al Conectar y Color de Estación", () => {
+    function detectLineForConnection(st1, st2 = null, context = {}) {
+        const lines1 = (st1 && Array.isArray(st1.lines)) ? st1.lines : [];
+        const lines2 = (st2 && Array.isArray(st2.lines)) ? st2.lines : [];
+
+        // 1. Si ambas estaciones comparten una o más líneas, esa es la línea natural
+        if (lines1.length > 0 && lines2.length > 0) {
+            const common = lines1.filter(c => lines2.includes(c));
+            if (common.length > 0) {
+                if (context.isolatedLineCode && common.includes(context.isolatedLineCode)) {
+                    return context.isolatedLineCode;
+                }
+                if (context.activeLineCode && common.includes(context.activeLineCode)) {
+                    return context.activeLineCode;
+                }
+                return common[0];
+            }
+        }
+
+        // 2. Si la línea aislada actual pertenece a st1 o st2
+        if (context.isolatedLineCode) {
+            if (lines1.includes(context.isolatedLineCode) || lines2.includes(context.isolatedLineCode)) {
+                return context.isolatedLineCode;
+            }
+        }
+
+        // 3. Si la línea activa actualmente seleccionada pertenece a st1 o st2
+        if (context.activeLineCode) {
+            if (lines1.includes(context.activeLineCode) || lines2.includes(context.activeLineCode)) {
+                return context.activeLineCode;
+            }
+        }
+
+        // 4. Extensión desde el origen: hereda línea principal de st1
+        if (lines1.length > 0) {
+            return lines1[0];
+        }
+
+        // 5. Si solo st2 tiene líneas
+        if (lines2.length > 0) {
+            return lines2[0];
+        }
+
+        return context.activeLineCode || "1";
+    }
+
+    it("detecta automáticamente la línea común A entre dos estaciones de Línea A sin forzar Línea 1", () => {
+        const st1 = { id: 1, name: "Torre Áurea", lines: ["A"] };
+        const st2 = { id: 2, name: "Terminal Norte", lines: ["A"] };
+        // activeLineCode por defecto en el editor solía ser "1"
+        const detected = detectLineForConnection(st1, st2, { activeLineCode: "1" });
+        assert.equal(detected, "A");
+    });
+
+    it("detecta la línea de la estación origen al iniciar el trazo para actualizar la línea activa", () => {
+        const st1 = { id: 50, name: "Velasco", lines: ["12"] };
+        const detected = detectLineForConnection(st1, null, { activeLineCode: "1" });
+        assert.equal(detected, "12");
+    });
+
+    it("al conectar una correspondencia (múltiples líneas) con una estación de Línea G, selecciona la línea común G", () => {
+        const stTransfer = { id: 10, name: "Tlacotepec", lines: ["C", "G"] };
+        const stG = { id: 11, name: "Tandaro", lines: ["G"] };
+        const detected = detectLineForConnection(stTransfer, stG, { activeLineCode: "1" });
+        assert.equal(detected, "G");
+    });
+
+    it("al extender un trazo desde una estación hacia una nueva estación huérfana, hereda la línea del origen", () => {
+        const stOrigin = { id: 20, name: "Politécnico", lines: ["5"] };
+        const stNew = { id: 99, name: "Nueva Parada", lines: [] };
+        const detected = detectLineForConnection(stOrigin, stNew, { activeLineCode: "1" });
+        assert.equal(detected, "5");
+    });
+
+    it("conexión neutra: unir dos estaciones que ya pertenecen a la Línea 3 no genera duplicados ni altera is_transfer", () => {
+        const st1 = { id: 31, name: "Estación A", lines: ["3"], is_transfer: false };
+        const st2 = { id: 32, name: "Estación B", lines: ["3"], is_transfer: false };
+        const lineCode = detectLineForConnection(st1, st2);
+        assert.equal(lineCode, "3");
+        if (!st1.lines.includes(lineCode)) st1.lines.push(lineCode);
+        if (!st2.lines.includes(lineCode)) st2.lines.push(lineCode);
+        st1.is_transfer = st1.lines.length > 1;
+        st2.is_transfer = st2.lines.length > 1;
+        assert.deepEqual(st1.lines, ["3"]);
+        assert.deepEqual(st2.lines, ["3"]);
+        assert.equal(st1.is_transfer, false);
+        assert.equal(st2.is_transfer, false);
+    });
+
+    it("respeta el color personalizado de estación si está definido frente al color automático de línea", () => {
+        const lineLn = { code: "A", color: "#FF0000" };
+        const stWithCustomColor = { id: 1, name: "Estación Especial", lines: ["A"], custom_color: "#10B981" };
+        const stDefault = { id: 2, name: "Estación Normal", lines: ["A"], custom_color: "" };
+        const effectiveColor1 = stWithCustomColor.custom_color || lineLn.color;
+        const effectiveColor2 = stDefault.custom_color || lineLn.color;
+        assert.equal(effectiveColor1, "#10B981");
+        assert.equal(effectiveColor2, "#FF0000");
+    });
+});

@@ -593,6 +593,35 @@
                 if (st) {
                     Object.assign(st, payload);
                     st.is_custom_modified = true;
+                    if (payload.lines !== undefined) {
+                        st.lines = Array.isArray(payload.lines) ? payload.lines : [];
+                        st.is_transfer = st.lines.length > 1;
+                    }
+                    if (payload.custom_color !== undefined) {
+                        st.custom_color = payload.custom_color;
+                    }
+                    if (payload.primary_line === "") {
+                        NetworkStore.lines.forEach(ln => {
+                            if (Array.isArray(ln.stops)) {
+                                ln.stops = ln.stops.filter(s => s.station_id !== stId);
+                                ln.declared_stations_count = ln.stops.length;
+                            }
+                        });
+                    } else if (payload.primary_line) {
+                        const ln = NetworkStore.linesByCode.get(payload.primary_line);
+                        if (ln && Array.isArray(ln.stops) && !ln.stops.some(s => s.station_id === stId)) {
+                            ln.stops.push({
+                                id: Date.now() + 1,
+                                station_id: stId,
+                                station_code: st.code,
+                                station_name: st.name,
+                                sequence: ln.stops.length,
+                                branch: "main",
+                                waypoints: []
+                            });
+                            ln.declared_stations_count = ln.stops.length;
+                        }
+                    }
                     if (updateStorage) {
                         if (!edits.stations[stId]) edits.stations[stId] = {};
                         Object.assign(edits.stations[stId], payload, { is_custom_modified: true });
@@ -1244,6 +1273,56 @@
                 (NetworkStore.lines[0] ? NetworkStore.lines[0].code : "1");
         },
 
+        detectLineForConnection(st1, st2 = null) {
+            const lines1 = (st1 && Array.isArray(st1.lines)) ? st1.lines : [];
+            const lines2 = (st2 && Array.isArray(st2.lines)) ? st2.lines : [];
+
+            // 1. Si ambas estaciones comparten una o más líneas, esa es la línea de unión
+            if (lines1.length > 0 && lines2.length > 0) {
+                const common = lines1.filter(c => lines2.includes(c));
+                if (common.length > 0) {
+                    if (NetworkStore.isolatedLineCode && common.includes(NetworkStore.isolatedLineCode)) {
+                        return NetworkStore.isolatedLineCode;
+                    }
+                    if (NetworkStore.activeLineCode && common.includes(NetworkStore.activeLineCode)) {
+                        return NetworkStore.activeLineCode;
+                    }
+                    return common[0];
+                }
+            }
+
+            // 2. Si la línea aislada actual en el visor pertenece a st1 o st2
+            if (NetworkStore.isolatedLineCode) {
+                if (lines1.includes(NetworkStore.isolatedLineCode) || lines2.includes(NetworkStore.isolatedLineCode)) {
+                    return NetworkStore.isolatedLineCode;
+                }
+            }
+
+            // 3. Si la línea activa actualmente en la barra de herramientas pertenece a st1 o st2
+            if (NetworkStore.activeLineCode) {
+                if (lines1.includes(NetworkStore.activeLineCode) || lines2.includes(NetworkStore.activeLineCode)) {
+                    return NetworkStore.activeLineCode;
+                }
+            }
+
+            // 4. Extensión desde la estación origen: heredar su línea principal
+            if (lines1.length > 0) {
+                return lines1[0];
+            }
+
+            // 5. Si solo la estación destino tiene línea asignada
+            if (lines2.length > 0) {
+                return lines2[0];
+            }
+
+            // 6. Fallback neutro a la línea activa de la barra o la primera disponible en la red
+            return this.getActiveLineCode();
+        },
+
+        clearActiveTool() {
+            this.cancel();
+        },
+
         setActiveLine(code) {
             if (!code) return;
             NetworkStore.activeLineCode = String(code);
@@ -1407,13 +1486,12 @@
             const selFrom = document.getElementById("newSegmentFromSelect");
             const selTo = document.getElementById("newSegmentToSelect");
 
-            // Si fromId viene de una estación con línea, sincronizar línea por defecto
+            // Sincronizar línea por defecto automáticamente detectada según las estaciones
             let defaultLineCode = NetworkStore.isolatedLineCode || document.getElementById("editLineSelect")?.value;
-            if (fromId) {
-                const stFrom = NetworkStore.stationsById.get(Number(fromId));
-                if (stFrom && Array.isArray(stFrom.lines) && stFrom.lines.length > 0) {
-                    defaultLineCode = stFrom.lines[0];
-                }
+            if (fromId || toId) {
+                const stFrom = fromId ? NetworkStore.stationsById.get(Number(fromId)) : null;
+                const stTo = toId ? NetworkStore.stationsById.get(Number(toId)) : null;
+                defaultLineCode = this.detectLineForConnection(stFrom, stTo);
             }
 
             if (selLine) {
@@ -1573,7 +1651,11 @@
                 document.querySelectorAll(".svg-station-node.connect-source").forEach(el => el.classList.remove("connect-source"));
                 const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${stId}"]`);
                 if (nodeEl) nodeEl.classList.add("connect-source");
-                const lineCode = this.getActiveLineCode();
+
+                // Auto-detectar de forma neutra la línea de la estación origen y sincronizar la barra y la vista
+                const lineCode = this.detectLineForConnection(st, null);
+                this.setActiveLine(lineCode);
+
                 const statusText = document.getElementById("edToolActiveText");
                 if (statusText) {
                     statusText.textContent = `Origen: ${st.name} (Línea ${lineCode}). Clic en la siguiente estación o lienzo para unir. (Esc: terminar)`;
@@ -1590,11 +1672,13 @@
             }
         },
 
-        async connectStationsDirectly(fromId, toId) {
-            const lineCode = this.getActiveLineCode();
+        async connectStationsDirectly(fromId, toId, targetLineCode = null) {
             const st1 = NetworkStore.stationsById.get(fromId);
             const st2 = NetworkStore.stationsById.get(toId);
             if (!st1 || !st2) return;
+
+            const lineCode = targetLineCode || this.detectLineForConnection(st1, st2);
+            this.setActiveLine(lineCode);
 
             try {
                 const res = await ApiClient.post("/api/line-segments/create/", {
@@ -1609,6 +1693,8 @@
                     return;
                 }
 
+                if (!Array.isArray(st1.lines)) st1.lines = [];
+                if (!Array.isArray(st2.lines)) st2.lines = [];
                 if (!st1.lines.includes(lineCode)) st1.lines.push(lineCode);
                 if (!st2.lines.includes(lineCode)) st2.lines.push(lineCode);
                 st1.is_transfer = st1.lines.length > 1;
@@ -1626,8 +1712,8 @@
 
                 showToast(`✓ Conectado: ${st1.name} ↔ ${st2.name} en Línea ${lineCode}`);
 
-                // Finalizar la conexión: limpiar la guía inmediatamente y desactivar la herramienta para evitar errores
-                this.clearActiveTool();
+                // Finalizar la conexión: limpiar la guía inmediatamente y desactivar la herramienta
+                this.cancel();
             } catch (err) {
                 console.error("Error al conectar tramo directo:", err);
                 showToast("Error al conectar estaciones");
@@ -1635,7 +1721,12 @@
         },
 
         async createAndConnectNewStation(x, y) {
-            const lineCode = this.getActiveLineCode();
+            let lineCode = this.getActiveLineCode();
+            if (this.segmentSourceStationId !== null) {
+                const st1 = NetworkStore.stationsById.get(this.segmentSourceStationId);
+                lineCode = this.detectLineForConnection(st1, null);
+                this.setActiveLine(lineCode);
+            }
             try {
                 const newName = `Estación ${NetworkStore.stations.length + 1}`;
                 const res = await ApiClient.post("/api/stations/create/", {
@@ -1657,9 +1748,18 @@
                 await refreshNetworkDataAndRender();
 
                 if (this.segmentSourceStationId !== null && newStId) {
-                    await this.connectStationsDirectly(this.segmentSourceStationId, newStId);
+                    await this.connectStationsDirectly(this.segmentSourceStationId, newStId, lineCode);
                 } else if (newStId) {
                     this.segmentSourceStationId = newStId;
+                    const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${newStId}"]`);
+                    if (nodeEl) nodeEl.classList.add("connect-source");
+                    showToast(`Estación ${newName} creada. Haz clic en el siguiente punto para unir en Línea ${lineCode}.`);
+                }
+            } catch (err) {
+                console.error("Error creando estación al trazar:", err);
+                showToast("Error al trazar nuevo punto");
+            }
+        },
                     const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${newStId}"]`);
                     if (nodeEl) nodeEl.classList.add("connect-source");
                     showToast(`Estación ${newName} creada. Haz clic en el siguiente punto para unir.`);
@@ -2863,14 +2963,15 @@
                 const isConst = st.operational_status === "construction";
                 const isOrphan = !st.lines || st.lines.length === 0;
                 const onlyBrt = !isOrphan && st.lines.every(c => c.startsWith("S"));
-                const primaryLine = (!isOrphan && st.lines.length === 1) ? NetworkStore.linesByCode.get(st.lines[0]) : null;
+                const primaryLine = (!isOrphan && st.lines.length >= 1) ? NetworkStore.linesByCode.get(st.lines[0]) : null;
+                const stationCustomStroke = st.custom_color || (primaryLine ? primaryLine.color : (isOrphan ? "#94a3b8" : "#182026"));
 
                 const isTransfer = st.is_transfer || (Array.isArray(st.lines) && st.lines.length > 1);
                 const radius = isSelected ? 13.5 : (isTransfer ? 10.4 : (st.is_premium_stop ? 8.2 : 5.8));
                 const fill = isClosed ? "#FDE8E8" : (isOrphan ? "var(--bg-surface)" : (st.is_premium_stop ? "#F59E0B" : "#FFFFFF"));
                 const stroke = isSelected
                     ? "#0055A4"
-                    : (isClosed ? "#9B2C2C" : (isConst ? "#0098D4" : (isOrphan ? "#94a3b8" : (primaryLine ? primaryLine.color : "#182026"))));
+                    : (isClosed ? "#9B2C2C" : (isConst ? "#0098D4" : stationCustomStroke));
                 const strokeW = isSelected ? 3.8 : (isTransfer ? 2.6 : 2.2);
                 const orphanClass = isOrphan ? " orphan" : "";
                 const dashAttr = isOrphan ? ' stroke-dasharray="4.5 3"' : '';
@@ -2880,8 +2981,8 @@
                     // Estilo Nodo de Correspondencia / Transbordo Seoul Metro Map (Doble Anillo concéntrico característico)
                     const outerR = isSelected ? 14.5 : 10.4;
                     const innerR = isSelected ? 8.2 : 5.6;
-                    const outerStroke = isSelected ? "#0055A4" : "#1E293B";
-                    const innerStroke = isSelected ? "#0055A4" : (primaryLine ? primaryLine.color : "#1E293B");
+                    const outerStroke = isSelected ? "#0055A4" : (st.custom_color || "#1E293B");
+                    const innerStroke = isSelected ? "#0055A4" : (st.custom_color || (primaryLine ? primaryLine.color : "#1E293B"));
                     stationsHtml += `
                         <g class="svg-station-node transfer-node${orphanClass}" data-station-id="${st.id}" opacity="${stOpacity}">
                             <circle cx="${st.x}" cy="${st.y}" r="${outerR}"
@@ -3384,7 +3485,8 @@
                 snapTarget = this.snapPointOctilinear([st1.x, st1.y], [mouseSvgPt.x, mouseSvgPt.y]);
             }
 
-            const lineCode = VisualEditorTools.getActiveLineCode();
+            const targetSt = hoveredStId ? NetworkStore.stationsById.get(hoveredStId) : null;
+            const lineCode = VisualEditorTools.detectLineForConnection(st1, targetSt);
             const ln = NetworkStore.linesByCode.get(lineCode);
             const strokeColor = ln ? ln.color : "#0055A4";
 
@@ -4692,6 +4794,14 @@
                 this.loadLineIntoEditor(NetworkStore.lines[0]?.code);
             }
 
+            const stPrimaryLineSel = document.getElementById("editStationPrimaryLine");
+            if (stPrimaryLineSel) {
+                stPrimaryLineSel.innerHTML = '<option value="">(Sin línea / Independiente)</option>' +
+                    NetworkStore.lines.map(
+                        l => `<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
+                    ).join("");
+            }
+
             const addRouteStSel = document.getElementById("addRouteStationSelect");
             const stOptionsHtml = NetworkStore.getSortedStations()
                 .map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
@@ -4807,6 +4917,46 @@
             const idInput = document.getElementById("editStationId");
             if (idInput) idInput.value = String(st.id);
             document.getElementById("editStationName").value = st.name;
+
+            const stPrimaryLineSel = document.getElementById("editStationPrimaryLine");
+            if (stPrimaryLineSel) {
+                if (stPrimaryLineSel.children.length <= 1) {
+                    stPrimaryLineSel.innerHTML = '<option value="">(Sin línea / Independiente)</option>' +
+                        NetworkStore.lines.map(
+                            l => `<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
+                        ).join("");
+                }
+                const firstLine = (Array.isArray(st.lines) && st.lines.length > 0) ? st.lines[0] : "";
+                stPrimaryLineSel.value = firstLine;
+
+                if (!stPrimaryLineSel._hasLineColorSync) {
+                    stPrimaryLineSel._hasLineColorSync = true;
+                    stPrimaryLineSel.addEventListener("change", (e) => {
+                        const colorInput = document.getElementById("editStationCustomColor");
+                        const colorActive = document.getElementById("editStationCustomColorActive");
+                        if (colorInput && (!colorActive || !colorActive.checked)) {
+                            const targetLn = NetworkStore.linesByCode.get(e.target.value);
+                            if (targetLn) {
+                                colorInput.value = targetLn.color;
+                            }
+                        }
+                    });
+                }
+            }
+
+            const colorInput = document.getElementById("editStationCustomColor");
+            const colorActive = document.getElementById("editStationCustomColorActive");
+            if (colorInput && colorActive) {
+                if (st.custom_color) {
+                    colorInput.value = st.custom_color;
+                    colorActive.checked = true;
+                } else {
+                    const firstLineObj = (Array.isArray(st.lines) && st.lines.length > 0) ? NetworkStore.linesByCode.get(st.lines[0]) : null;
+                    colorInput.value = firstLineObj ? firstLineObj.color : "#0055A4";
+                    colorActive.checked = false;
+                }
+            }
+
             document.getElementById("editStationInfra").value = st.infrastructure_type;
             document.getElementById("editStationStatus").value = st.operational_status;
             document.getElementById("editStationX").value = st.x;
@@ -5753,6 +5903,23 @@
                 const selectedTerminals = Array.from(
                     document.querySelectorAll("#editStationTerminalsGroup .terminal-line-chip.active")
                 ).map(btn => btn.dataset.lineCode).filter(Boolean);
+
+                const primaryLineVal = document.getElementById("editStationPrimaryLine")?.value || "";
+                const isCustomColorActive = Boolean(document.getElementById("editStationCustomColorActive")?.checked);
+                const customColorVal = isCustomColorActive ? (document.getElementById("editStationCustomColor")?.value || "#0055A4") : "";
+
+                const stObj = NetworkStore.stationsById.get(stId);
+                let currentLines = (stObj && Array.isArray(stObj.lines)) ? [...stObj.lines] : [];
+                if (primaryLineVal) {
+                    if (currentLines.includes(primaryLineVal)) {
+                        currentLines = [primaryLineVal, ...currentLines.filter(c => c !== primaryLineVal)];
+                    } else {
+                        currentLines.unshift(primaryLineVal);
+                    }
+                } else if (document.getElementById("editStationPrimaryLine")) {
+                    currentLines = [];
+                }
+
                 const payload = {
                     name: document.getElementById("editStationName").value,
                     infrastructure_type: document.getElementById("editStationInfra").value,
@@ -5765,7 +5932,11 @@
                     has_psd: document.getElementById("editStationPsd").checked,
                     is_premium_stop: document.getElementById("editStationPremium").checked,
                     icon_tags: selectedTags,
-                    terminal_lines: selectedTerminals
+                    terminal_lines: selectedTerminals,
+                    lines: currentLines,
+                    primary_line: primaryLineVal,
+                    custom_color: customColorVal,
+                    is_transfer: currentLines.length > 1
                 };
                 const res = await ApiClient.post(`/api/stations/${stId}/update/`, payload);
                 if (!res.ok) {

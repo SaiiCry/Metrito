@@ -208,6 +208,12 @@ class Station(models.Model):
         default=False,
         help_text="Parada del Servicio Expreso/Premium (20 estaciones clave de Línea A)"
     )
+    custom_color = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        help_text="Color personalizado opcional para la estación"
+    )
     icon_tags = models.JSONField(
         default=list,
         blank=True,

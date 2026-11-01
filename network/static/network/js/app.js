@@ -46,8 +46,17 @@
         operationalTimeSec: 6 * 3600 + 30 * 60, // 06:30:00 AM
 
         async fetchAll(customFetch = globalThis.fetch) {
-            const resp = await customFetch("/api/network/");
-            if (!resp.ok) throw new Error("Error cargando topología de la red SMyT");
+            let resp;
+            try {
+                resp = await customFetch("/api/network/");
+                if (!resp || !resp.ok) {
+                    throw new Error("Fallback to static data");
+                }
+            } catch (err) {
+                // Modo estático autónomo para alojamiento en GitHub Pages
+                resp = await customFetch("data/network.json");
+            }
+            if (!resp || !resp.ok) throw new Error("Error cargando topología de la red SMyT");
             const data = await resp.json();
             this.hydrate(data);
             return data;

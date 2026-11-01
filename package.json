@@ -4,6 +4,7 @@
   "description": "Pruebas de frontend para el editor de trazado de red SMyT",
   "type": "module",
   "scripts": {
-    "test": "node --test tests_frontend/test_network_store.mjs"
+    "test": "node --test tests_frontend/test_network_store.mjs",
+    "build:pages": "python export_static_site.py"
   }
 }

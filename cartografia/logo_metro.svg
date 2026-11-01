@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-labelledby="logo-titulo logo-desc">
+  <title id="logo-titulo">Logotipo Oficial SIMMA — Metro y Movilidad de Asura</title>
+  <desc id="logo-desc">Emblema octilineal del Sistema Integrado de Metro y Movilidad de Asura.</desc>
+  <!-- Escudo arquitectónico SIMMA -->
+  <rect x="12" y="12" width="216" height="216" rx="46" fill="#FFFFFF" stroke="#182026" stroke-width="8"/>
+  <!-- Anillo orbital periférico (Línea A · 132,8 km) -->
+  <polygon points="84,34 156,34 206,84 206,156 156,206 84,206 34,156 34,84" fill="#F6F5F0" stroke="#0F7173" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Tres trazos octilineales formando el monograma M -->
+  <path d="M 68 166 L 68 82 L 120 134" fill="none" stroke="#D9232E" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 172 166 L 172 82 L 120 134" fill="none" stroke="#0055A4" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 120 134 L 120 172" fill="none" stroke="#D98A00" stroke-width="14" stroke-linecap="round"/>
+  <!-- Nodo de correspondencia central (Santa Mónica) -->
+  <circle cx="120" cy="134" r="13" fill="#FFFFFF" stroke="#182026" stroke-width="6"/>
+  <circle cx="68" cy="82" r="7" fill="#FFFFFF" stroke="#182026" stroke-width="4"/>
+  <circle cx="172" cy="82" r="7" fill="#FFFFFF" stroke="#182026" stroke-width="4"/>
+  <rect x="64" y="181" width="112" height="24" rx="12" fill="#182026"/>
+  <g transform="translate(11, 0)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><!-- S --><path d="M 85 188.5 L 78.5 188.5 L 78.5 193 L 85 193 L 85 197.5 L 78.5 197.5"/><!-- I --><path d="M 92 188.5 L 92 197.5"/><!-- M --><path d="M 99 197.5 L 99 188.5 L 104 193.5 L 109 188.5 L 109 197.5"/><!-- M --><path d="M 115 197.5 L 115 188.5 L 120 193.5 L 125 188.5 L 125 197.5"/><!-- A --><path d="M 131 197.5 L 135.5 188.5 L 140 197.5 M 132.5 194.8 L 138.5 194.8"/></g>
+</svg>

@@ -1,0 +1,994 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMMA · Sistema Integrado de Metro y Movilidad de Asura (PCCO y Cartografía Editable)</title>
+    <!-- Leaflet CSS para la vista geográfica alternativa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="{% static 'network/css/styles.css' %}">
+</head>
+<body>
+    <!-- Barra Superior de Señalización y Mando Centralizado (PCCO) -->
+    <header class="topbar" role="banner">
+        <div class="topbar-brand">
+            <div class="brand-emblem" aria-hidden="true">
+                <img src="/api/cartografia/logo/" alt="Logotipo SIMMA" width="36" height="36" style="display:block; width:36px; height:36px;">
+            </div>
+            <div class="brand-titles">
+                <div class="brand-main">
+                    <span class="brand-acronym">SIMMA</span>
+                    <span class="brand-divider">·</span>
+                    <h1 class="brand-name">Sistema Integrado de Metro y Movilidad de Asura</h1>
+                </div>
+                <p class="brand-subtitle">Puesto Central de Control Operativo (PCCO) · 34 Líneas (22 Metro + A–G + 5 BRT) · 828 Estaciones · 54 u/km</p>
+            </div>
+        </div>
+
+        <!-- Selector de Vista Principal / Geográfica y Modo de Simbología -->
+        <div class="topbar-controls" role="toolbar" aria-label="Modos de visualización">
+            <div class="segmented-control" role="group" aria-label="Modo de mapa">
+                <button type="button" class="seg-btn active" id="btnViewSchematic" data-view="schematic">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                    Esquema Metro (SVG)
+                </button>
+                <button type="button" class="seg-btn" id="btnViewGeo" data-view="geo">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    Vista Geográfica
+                </button>
+            </div>
+
+            <div class="segmented-control" role="group" aria-label="Simbología de vía">
+                <button type="button" class="seg-btn active" id="btnColorByLine" data-colormode="line" title="Colorear trazados por código oficial de línea">
+                    Color de Línea
+                </button>
+                <button type="button" class="seg-btn" id="btnColorByInfra" data-colormode="infra" title="Colorear tramos por tipo de infraestructura (Subterráneo, Túnel Profundo, Superficial, Viaducto Elevado)">
+                    Ingeniería de Tramo
+                </button>
+            </div>
+
+            <button type="button" class="action-pill" id="btnToggleEditMode" aria-pressed="false" title="Activar edición cartográfica interactiva (arrastrar estaciones y polígonos de la ciudad)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>Editar Cartografía</span>
+            </button>
+
+            <button type="button" class="action-pill" id="btnTogglePngOverlay" aria-pressed="false" title="Superponer lámina oficial red_metro.svg (5520x3980) para verificación 1:1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span>Lámina Oficial SVG</span>
+            </button>
+        </div>
+
+        <!-- Indicadores de Tiempo Real y Reloj Operativo -->
+        <div class="topbar-telemetry">
+            <div class="telemetry-stat" title="Unidades en circulación activa (Trenes de Metro + Autobuses Biarticulados)">
+                <span class="stat-label">FLOTA EN VÍA</span>
+                <span class="stat-value tabular" id="kpiActiveTrains">0</span>
+            </div>
+            <div class="telemetry-stat" title="Ocupación media ponderada del sistema">
+                <span class="stat-label">OCUPACIÓN</span>
+                <span class="stat-value tabular" id="kpiAvgOccupancy">64%</span>
+            </div>
+            <div class="telemetry-stat" title="Alertas operativas activas en PCCO">
+                <span class="stat-label">ALERTAS</span>
+                <span class="stat-value tabular status-warn" id="kpiActiveAlerts">0</span>
+            </div>
+            <div class="clock-box">
+                <span class="clock-time tabular" id="operationalClock">06:30:00</span>
+                <div class="sim-speed-group" role="group" aria-label="Velocidad de simulación">
+                    <button type="button" class="speed-chip active" data-speed="1">1×</button>
+                    <button type="button" class="speed-chip" data-speed="3">3×</button>
+                    <button type="button" class="speed-chip" data-speed="8">8×</button>
+                    <button type="button" class="speed-chip" data-speed="0" id="btnPauseSim" title="Pausar / Reanudar movimiento">⏸</button>
+                </div>
+            </div>
+            <button type="button" class="icon-btn" id="btnThemeToggle" title="Cambiar tema visual (Oscuro PCCO / Claro Editorial)" aria-label="Cambiar tema visual">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal de Trabajo -->
+    <main class="workspace">
+        <!-- Panel Lateral Izquierdo: Catálogo de Red, Tipología y Filtros -->
+        <aside class="sidebar-left" id="sidebarLeft" aria-label="Directorio de líneas y filtros de red">
+            <div class="sidebar-search">
+                <div class="search-input-wrap">
+                    <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    <input type="search" id="globalSearchInput" placeholder="Buscar estación, línea o terminal (tecla /)..." autocomplete="off" aria-label="Buscar estación o línea">
+                    <kbd class="search-Shortcut">/</kbd>
+                </div>
+                <div class="search-results-dropdown hidden" id="searchResultsDropdown" role="listbox"></div>
+            </div>
+
+            <!-- Filtro explícito de Tipología de la Red -->
+            <div class="typology-filter-section">
+                <div class="section-header-row">
+                    <span class="section-eyebrow">TIPOLOGÍA DE LA RED</span>
+                    <button type="button" class="text-link-btn" id="btnShowAllLines">Mostrar todas (34)</button>
+                </div>
+                <div class="typology-pills" role="tablist" aria-label="Filtrar por tipología de transporte">
+                    <button type="button" class="typo-pill active" data-netfilter="all">
+                        <span class="typo-dot all-dot"></span>
+                        <div class="typo-info">
+                            <strong>Red Integrada SIMMA</strong>
+                            <span>34 líneas · 828 estaciones únicas</span>
+                        </div>
+                    </button>
+                    <button type="button" class="typo-pill" data-netfilter="metro">
+                        <span class="typo-dot metro-dot"></span>
+                        <div class="typo-info">
+                            <strong>Metro (Convencional 1-22 y Alimentador A-G)</strong>
+                            <span>29 líneas férreas/neumáticas · 710 estaciones</span>
+                        </div>
+                    </button>
+                    <button type="button" class="typo-pill" data-netfilter="bus_articulado">
+                        <span class="typo-dot brt-dot"></span>
+                        <div class="typo-info">
+                            <strong>Red de Autobuses Articulados (BRT)</strong>
+                            <span>5 sistemas auxiliares (S1-S5) · 149 paradas</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtro rápido por tipo de infraestructura o estado -->
+            <div class="infra-filter-bar">
+                <span class="section-eyebrow">FILTRO DE INFRAESTRUCTURA / ESTADO</span>
+                <div class="chip-row" id="infraFilterChips">
+                    <button type="button" class="filter-chip active" data-infra="all">Todos</button>
+                    <button type="button" class="filter-chip" data-infra="subterraneo">Subterráneo</button>
+                    <button type="button" class="filter-chip" data-infra="tunel_profundo">Túnel Profundo</button>
+                    <button type="button" class="filter-chip" data-infra="superficial">Superficial</button>
+                    <button type="button" class="filter-chip" data-infra="elevado">Viaducto Elevado</button>
+                    <button type="button" class="filter-chip" data-infra="closed_permanent">Tramo Clausurado (Línea C)</button>
+                    <button type="button" class="filter-chip" data-infra="construction">En Obra (L18 / S5)</button>
+                </div>
+            </div>
+
+            <!-- Lista de las 34 Líneas con insignias oficiales -->
+            <div class="lines-directory-header">
+                <span class="section-eyebrow" id="linesCountLabel">DIRECTORIO DE LÍNEAS (34)</span>
+                <button type="button" class="text-link-btn" id="btnIsolateClear" hidden>Salir de aislamiento</button>
+            </div>
+            <div class="lines-list" id="linesDirectoryList" role="list">
+                <!-- Poblado dinámicamente por JS -->
+            </div>
+        </aside>
+
+        <!-- Área Central: Lienzo Cartográfico Interactivo (SVG Esquemático + Leaflet Geo) -->
+        <section class="map-stage" aria-label="Mapa interactivo de la red de transporte">
+            <!-- Barra flotante de navegación rápida y herramientas cartográficas -->
+            <div class="map-floating-toolbar">
+                <button type="button" class="map-tool-btn" id="btnZoomIn" title="Acercar vista (+)" aria-label="Acercar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <button type="button" class="map-tool-btn" id="btnZoomOut" title="Alejar vista (-)" aria-label="Alejar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+                </button>
+                <button type="button" class="map-tool-btn" id="btnZoomCore" title="Enfocar Núcleo Central (Santa Mónica / Hidalgo / Sofia)">
+                    Núcleo Central
+                </button>
+                <button type="button" class="map-tool-btn" id="btnZoomFull" title="Ver Circuito Periférico Completo (Línea A · 132,8 km)">
+                    Red Completa
+                </button>
+                <button type="button" class="map-tool-btn" id="btnZoomLineC" title="Inspeccionar Línea C (21 operativas / 13 cerradas permanentemente)">
+                    Caso Línea C
+                </button>
+                <button type="button" class="map-tool-btn" id="btnToggleLabels" aria-pressed="true" title="Mostrar / ocultar nombres de estaciones">
+                    Etiquetas
+                </button>
+                <button type="button" class="map-tool-btn" id="btnEditCityZones" title="Editar polígonos y forma geográfica de la ciudad">
+                    Polígonos Ciudad
+                </button>
+                <button type="button" class="map-tool-btn" id="btnQuickAddStation" title="Crear y colocar una nueva estación en la red" style="color:var(--accent-blue); font-weight:600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                    <span>+ Estación</span>
+                </button>
+                <div class="track-width-control" title="Ajustar grosor visual de los trazos de las líneas">
+                    <label for="trackWidthRange">Grosor</label>
+                    <input type="range" id="trackWidthRange" min="0.7" max="1.8" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <!-- Control deslizante de opacidad cuando la lámina red_metro.svg está activa -->
+            <div class="png-overlay-controls hidden" id="pngOverlayControls">
+                <label for="pngOpacityRange">Opacidad lámina <code>red_metro.svg</code>:</label>
+                <input type="range" id="pngOpacityRange" min="0.05" max="0.95" step="0.05" value="0.45">
+                <span class="tabular" id="pngOpacityVal">45%</span>
+            </div>
+
+            <!-- Barra de herramientas del Editor Visual de Red (Edición en Vivo) -->
+            <div class="visual-editor-toolbar hidden" id="visualEditorToolbar" role="toolbar" aria-label="Herramientas de edición visual de red">
+                <div class="ed-toolbar-group">
+                    <span class="ed-toolbar-label">HERRAMIENTAS:</span>
+                    <button type="button" class="ed-tool-btn" id="btnToolAddStation" title="Crear nueva estación: activa clic en el mapa o abre modal">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                        <span>＋ Estación</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn" id="btnToolAddLine" title="Crear nueva línea en la red (Metro o Autobús Articulado)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19L19 4M8 20l12-12M4 15l7-7"/></svg>
+                        <span>＋ Línea</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn" id="btnToolAddSegment" title="Conectar tramo: haz clic sucesivamente en dos estaciones para enlazarlas">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5l7 7"/></svg>
+                        <span>⤹ Conectar Tramo</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn" id="btnToolAddCorrespondence" title="Agregar correspondencia / transbordo entre líneas">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M9 21H4v-5M15 9l6-6M4 4l5 5"/></svg>
+                        <span>⇄ Correspondencia</span>
+                    </button>
+                </div>
+
+                <div class="ed-toolbar-divider"></div>
+
+                <div class="ed-toolbar-group">
+                    <button type="button" class="ed-tool-btn" id="btnEditorUndo" title="Deshacer última acción (Ctrl+Z)" disabled>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+                        <span>Deshacer</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn" id="btnEditorRedo" title="Rehacer acción (Ctrl+Y)" disabled>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></svg>
+                        <span>Rehacer</span>
+                    </button>
+                </div>
+
+                <div class="ed-toolbar-divider"></div>
+
+                <div class="ed-toolbar-group ed-toolbar-actions">
+                    <button type="button" class="ed-tool-btn ed-save-btn" id="btnSaveUserLayer" title="Guardar red y cambios en la capa independiente de usuario">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar Red</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn ed-discard-btn" id="btnDiscardUserLayer" title="Descartar cambios no guardados / Volver al Plan Maestro">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        <span>Descartar</span>
+                    </button>
+                </div>
+
+                <div class="ed-tool-status hidden" id="edToolActiveStatus">
+                    <span class="status-indicator-dot"></span>
+                    <span id="edToolActiveText">Selecciona la posición de la nueva estación</span>
+                    <button type="button" class="ed-cancel-tool-btn" id="btnCancelActiveTool" title="Cancelar herramienta activa">✕</button>
+                </div>
+            </div>
+
+            <!-- Banner informativo cuando el Modo Edición Cartográfica está activo -->
+            <div class="edit-mode-banner hidden" id="editModeBanner" role="status">
+                <span class="banner-dot"></span>
+                <div>
+                    <strong>Modo Edición de Red y Cartografía Activo:</strong>
+                    Usa los botones superiores para agregar estaciones, líneas, tramos o correspondencias. También puedes arrastrar estaciones o hacer clic sobre cualquier tramo para moldear curvas y waypoints.
+                </div>
+                <button type="button" class="banner-btn" id="btnResetMasterPlan" title="Restaurar coordenadas originales de red_metro.json">
+                    Restaurar Plan Maestro
+                </button>
+            </div>
+
+            <!-- Vista 1 (Principal): Esquema de Metro Vectorial SVG (5520 x 3980 · 54 u/km) -->
+            <div class="schematic-viewport" id="schematicViewport">
+                <!-- Tarjeta de título cartográfico estilo Seoul Metro Map -->
+                <div class="metro-schematic-title-card" id="metroTitleCard" aria-hidden="true">
+                    <div class="metro-title-sub-kr">수도권 도시철도 노선도</div>
+                    <div class="metro-title-main">RED METROPOLITANA DE TRANSPORTE</div>
+                    <div class="metro-title-meta">PLANO ESQUEMÁTICO OFICIAL · ESTACIONES & CORRESPONDENCIAS</div>
+                </div>
+                <svg id="metroSchematicSvg" viewBox="0 0 5520 3980" preserveAspectRatio="xMidYMid meet" aria-label="Esquema cartográfico SIMMA">
+                    <defs>
+                        <!-- Patrón para tramos clausurados permanentemente -->
+                        <pattern id="closedHatch" width="24" height="24" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                            <line x1="0" y1="0" x2="0" y2="24" stroke="#ef4444" stroke-width="8" stroke-opacity="0.35" />
+                        </pattern>
+                    </defs>
+                    <!-- Capa 0: Lámina oficial red_metro.svg opcional como referencia 1:1 -->
+                    <g id="svgLayerReferenceImage" class="hidden" opacity="0.45">
+                        <image href="/api/cartografia/svg/" x="0" y="0" width="5520" height="3980" preserveAspectRatio="none" />
+                    </g>
+                    <!-- Capa 1: Polígonos geográficos editables de la ciudad ficticia -->
+                    <g id="svgLayerCityOutlines"></g>
+                    <!-- Capa 2: Cuadrícula técnica y cotas del terreno -->
+                    <g id="svgLayerGrid"></g>
+                    <!-- Capa 3: Trazados de las 34 líneas con simbología por tipo de infraestructura y red -->
+                    <g id="svgLayerTracks"></g>
+                    <!-- Capa 3B: Áreas interactivas para insertar/moldear codos sobre cualquier trazo en Modo Edición -->
+                    <g id="svgLayerTrackHits"></g>
+                    <!-- Capa 4: Estaciones (828 Metro + 171 Autobuses Articulados) y correspondencias -->
+                    <g id="svgLayerStations"></g>
+                    <!-- Capa 4A: Iconos con el número/código de línea al lado de cada estación terminal -->
+                    <g id="svgLayerTerminalBadges"></g>
+                    <!-- Capa 4B: Tags con iconos de equipamiento urbano a un costado de la estación -->
+                    <g id="svgLayerStationTags"></g>
+                    <!-- Capa 5: Etiquetas tipográficas de estaciones y terminales -->
+                    <g id="svgLayerLabels"></g>
+                    <!-- Capa 6: Trenes de Metro y Autobuses Articulados en tiempo real (60 fps) -->
+                    <g id="svgLayerTrains"></g>
+                    <!-- Capa 7: Vértices de edición de trazos de líneas y polígonos urbanos -->
+                    <g id="svgLayerEditHandles"></g>
+                </svg>
+            </div>
+
+            <!-- Vista 2 (Alternativa): Mapa Geográfico con Leaflet -->
+            <div class="geo-viewport hidden" id="geoViewport">
+                <div id="leafletGeoMap"></div>
+            </div>
+
+            <!-- Leyenda Técnica de Simbología e Infraestructura -->
+            <div class="map-legend" id="mapLegend" aria-label="Leyenda técnica de la red">
+                <div class="legend-header">
+                    <span>SIMBOLOGÍA DE RED E INFRAESTRUCTURA</span>
+                    <button type="button" class="legend-toggle-btn" id="btnToggleLegend" title="Minimizar / expandir leyenda">−</button>
+                </div>
+                <div class="legend-body" id="legendBody">
+                    <div class="legend-col">
+                        <span class="legend-subtitle">Tipología del Sistema</span>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-metro"></span>
+                            <span><strong>Metro (1-22 y A-G):</strong> Vía férrea/neumática continua</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-brt"></span>
+                            <span><strong>Autobuses Articulados (S1-S5):</strong> Carril confinado BRT</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-node-sample sample-premium"></span>
+                            <span><strong>Línea A Expreso Premium:</strong> 20 estaciones clave (300 s)</span>
+                        </div>
+                    </div>
+                    <div class="legend-col">
+                        <span class="legend-subtitle">Ingeniería de Tramo y Estado</span>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-subterraneo"></span>
+                            <span><strong>Subterráneo (-8 a -25 m):</strong> Cajón cortar y cubrir</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-profundo"></span>
+                            <span><strong>Túnel Profundo (-28 a -75 m):</strong> Escudo TBM + lumbreras</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-superficial"></span>
+                            <span><strong>Superficial (0 m):</strong> Camellón / derecho de vía confinado</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-elevado"></span>
+                            <span><strong>Viaducto Elevado (+7 a +9,5 m):</strong> Trabe cajón prefabricada</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-line-sample sample-closed"></span>
+                            <span><strong>Cerrado / En Obra:</strong> Línea C (13 cerradas) · L18 / S5</span>
+                        </div>
+                    </div>
+                    <div class="legend-tags-row" id="legendIconTagsRow">
+                        <!-- Poblado dinámicamente con los 6 iconos oficiales de equipamiento -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coordenadas del cursor y cadenamiento en vivo -->
+            <div class="map-statusbar">
+                <span class="tabular" id="cursorCoordsDisplay">Lienzo: X 5709 · Y 1789 | Geo: 19.4403° N, -99.1448° W</span>
+                <span class="statusbar-sep">·</span>
+                <span>Criterio Geométrico: Sobreelevación en R &lt; 1.800 m · Tangente mín. 17,000 m · Curva mín. 16,00 m</span>
+            </div>
+        </section>
+
+        <!-- Panel Lateral Derecho: Centro de Control Operativo (PCCO) e Inspector Contextual -->
+        <aside class="sidebar-right" id="sidebarRight" aria-label="Centro de Control Operativo e Inspector">
+            <!-- Pestañas de navegación del Panel Derecho -->
+            <nav class="right-tabs" role="tablist">
+                <button type="button" class="rtab-btn active" data-rtab="pcco" role="tab" aria-selected="true">
+                    PCCO y Alertas
+                </button>
+                <button type="button" class="rtab-btn" data-rtab="inspector" role="tab" aria-selected="false" id="tabBtnInspector">
+                    Inspector / Plano
+                </button>
+                <button type="button" class="rtab-btn" data-rtab="metrics" role="tab" aria-selected="false">
+                    Ocupación y Líneas
+                </button>
+                <button type="button" class="rtab-btn" data-rtab="editor" role="tab" aria-selected="false">
+                    Editor de Datos
+                </button>
+            </nav>
+
+            <!-- TAB 1: PCCO (Alertas, Simulación de Incidencias y Registro de Eventos) -->
+            <div class="rtab-panel active" id="panelPcco" role="tabpanel">
+                <div class="pcco-status-card">
+                    <div class="pcco-status-top">
+                        <div>
+                            <span class="section-eyebrow">ESTADO GENERAL DE LA RED</span>
+                            <h2 class="pcco-health-title" id="networkHealthTitle">Operación Nominal Controlada</h2>
+                        </div>
+                        <span class="health-badge nominal" id="networkHealthBadge">98,4% DISP.</span>
+                    </div>
+                    <div class="pcco-kpi-grid">
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Estaciones Metro</span>
+                            <strong class="tabular" id="pccoMetroStations">828</strong>
+                            <small>29 líneas (1-22, A-G)</small>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Autobuses Articulados</span>
+                            <strong class="tabular" id="pccoBrtStations">171</strong>
+                            <small>5 sistemas (S1-S5)</small>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Línea A Circuito</span>
+                            <strong class="tabular">150s / 300s</strong>
+                            <small>124 ord. · 20 premium</small>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Línea C Operativa</span>
+                            <strong class="tabular">21 / 34</strong>
+                            <small>13 cerradas perm.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Acciones de Simulación de Alertas en PCCO -->
+                <div class="alerts-section-header">
+                    <span class="section-eyebrow">ALERTAS E INCIDENCIAS EN TIEMPO REAL</span>
+                    <div class="alerts-actions">
+                        <button type="button" class="btn-secondary btn-xs" id="btnOpenNewAlertModal">+ Crear Alerta</button>
+                        <button type="button" class="btn-primary btn-xs" id="btnSimulateIncident" title="Genera un incidente operativo verosímil que modifica velocidades y frecuencias">
+                            ⚡ Simular Incidente
+                        </button>
+                    </div>
+                </div>
+
+                <div class="alerts-list" id="pccoAlertsList">
+                    <!-- Poblado por JS -->
+                </div>
+
+                <div class="event-log-section">
+                    <div class="section-header-row">
+                        <span class="section-eyebrow">REGISTRO DE EVENTOS E HISTORIAL RECIENTE</span>
+                        <span class="live-indicator"><i class="pulse-dot"></i> EN VIVO</span>
+                    </div>
+                    <div class="event-log-feed tabular" id="liveEventTicker" role="log" aria-live="polite">
+                        <!-- Eventos en tiempo real generados por el movimiento de trenes y PCCO -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Inspector Contextual (Estación seleccionada con Plano de Ingeniería o Tren en movimiento) -->
+            <div class="rtab-panel hidden" id="panelInspector" role="tabpanel">
+                <div id="inspectorEmptyState" class="inspector-empty">
+                    <div class="empty-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>
+                    </div>
+                    <h3>Selecciona una Estación o un Tren</h3>
+                    <p>Haz clic sobre cualquiera de las 828 estaciones de Metro, las 171 paradas de Autobuses Articulados o sobre un convoy en movimiento para consultar próximos arribos, ingeniería constructiva y edición directa.</p>
+                    <div class="quick-pick-chips">
+                        <button type="button" class="filter-chip js-quick-station" data-stname="Santa Mónica">Nodo Santa Mónica (1/4/7/15/18)</button>
+                        <button type="button" class="filter-chip js-quick-station" data-stname="Ciudad Azteca">Ciudad Azteca (Línea A Premium)</button>
+                        <button type="button" class="filter-chip js-quick-station" data-stname="Tlacotepec">Tlacotepec (Corte Línea C)</button>
+                        <button type="button" class="filter-chip js-quick-station" data-stname="Túnel Emisor">Túnel Emisor (-75 m)</button>
+                    </div>
+                </div>
+
+                <!-- Vista de Detalle de Estación -->
+                <div id="stationInspectorContent" class="inspector-content hidden">
+                    <!-- Poblado dinámicamente al hacer clic en una estación -->
+                </div>
+
+                <!-- Vista de Detalle de Tren / Autobús Articulado -->
+                <div id="trainInspectorContent" class="inspector-content hidden">
+                    <!-- Poblado dinámicamente al hacer clic en un tren -->
+                </div>
+            </div>
+
+            <!-- TAB 3: Indicadores de Ocupación, Frecuencias y Geometría por Línea -->
+            <div class="rtab-panel hidden" id="panelMetrics" role="tabpanel">
+                <div class="section-header-row">
+                    <span class="section-eyebrow">INDICADORES OPERATIVOS Y GEOMÉTRICOS POR LÍNEA</span>
+                </div>
+                <div class="metrics-table-wrap" id="lineMetricsContainer">
+                    <!-- Tabla/tarjetas de ocupación, frecuencia, longitud y criterios geométricos -->
+                </div>
+            </div>
+
+            <!-- TAB 4: Editor Integral de Datos (Líneas, Estaciones, Horarios, Frecuencias y Polígonos) -->
+            <div class="rtab-panel hidden" id="panelEditor" role="tabpanel">
+                <div class="editor-subtabs">
+                    <button type="button" class="ed-subtab active" data-edtab="line">Editar Línea / Horarios</button>
+                    <button type="button" class="ed-subtab" data-edtab="station">Editar Estación</button>
+                    <button type="button" class="ed-subtab" data-edtab="correspondence">Correspondencias</button>
+                    <button type="button" class="ed-subtab" data-edtab="city">Editar Ciudad</button>
+                </div>
+
+                <!-- Formulario Editor de Línea -->
+                <form id="formEditLine" class="editor-form">
+                    <div class="form-group">
+                        <label for="editLineSelect">Seleccionar Línea (1-22, A-G, S1-S5)</label>
+                        <select id="editLineSelect" class="form-control"></select>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="editLineName">Nombre Oficial</label>
+                            <input type="text" id="editLineName" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editLineColor">Color Hexadecimal</label>
+                            <div class="color-input-group">
+                                <input type="color" id="editLineColorPicker" class="color-Swatch">
+                                <input type="text" id="editLineColor" class="form-control tabular" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editLineRoute">Terminales / Ruta</label>
+                        <input type="text" id="editLineRoute" class="form-control" required>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="editLineNetworkType">Tipología de Red</label>
+                            <select id="editLineNetworkType" class="form-control">
+                                <option value="metro">Metro (Convencional / Alimentadora)</option>
+                                <option value="bus_articulado">Red de Autobuses Articulados (Metropolitano)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editLineStatus">Estado Operativo</label>
+                            <select id="editLineStatus" class="form-control">
+                                <option value="operational">En Operación Normal</option>
+                                <option value="partial">Operación Parcial / Tramo Clausurado</option>
+                                <option value="expansion_pending">Con Ampliación Pendiente</option>
+                                <option value="construction">En Construcción</option>
+                                <option value="suspended">Servicio Suspendido</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="editLineFreq">Frecuencia (seg)</label>
+                            <input type="number" id="editLineFreq" class="form-control tabular" min="45" max="900" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editLinePremFreq">Frec. Premium (seg)</label>
+                            <input type="number" id="editLinePremFreq" class="form-control tabular" min="60" max="1200" placeholder="Opcional (ej. 300)">
+                        </div>
+                        <div class="form-group">
+                            <label for="editLineSpeed">Vel. Máx (km/h)</label>
+                            <input type="number" id="editLineSpeed" class="form-control tabular" min="20" max="140" step="1" required>
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="editLineFirstTrain">Primer Tren</label>
+                            <input type="text" id="editLineFirstTrain" class="form-control tabular" value="05:00">
+                        </div>
+                        <div class="form-group">
+                            <label for="editLineLastTrain">Último Tren</label>
+                            <input type="text" id="editLineLastTrain" class="form-control tabular" value="23:59">
+                        </div>
+                        <div class="form-group">
+                            <label for="editLineOccupancy">Ocupación (%)</label>
+                            <input type="number" id="editLineOccupancy" class="form-control tabular" min="0" max="100">
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="editLineLength">Longitud (km)</label>
+                            <input type="number" id="editLineLength" class="form-control tabular" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="editLineRadius">Radio Mín. Curva (m)</label>
+                            <input type="number" id="editLineRadius" class="form-control tabular" step="5">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editLineNote">Nota Operativa / Estado de Obra</label>
+                        <textarea id="editLineNote" class="form-control" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary btn-block">Guardar Cambios en Línea</button>
+
+                    <!-- Editor de Trayecto (Secuencia de Paradas) y Moldeado de Trazos -->
+                    <div class="route-editor-box">
+                        <div class="section-header-row">
+                            <span class="section-eyebrow">TRAYECTO Y MOLDEADO DE TRAZOS</span>
+                            <span class="tabular" id="routeStopsCountBadge" style="font-size:10.5px; color:var(--text-secondary);">0 paradas</span>
+                        </div>
+                        <p class="form-hint">Acomoda el trazo arrastrando directamente la línea en el mapa, o reordena/agrega paradas al trayecto de esta línea:</p>
+                        <div class="form-row-2" style="margin-top:4px;">
+                            <button type="button" class="btn-secondary btn-xs" id="btnIsolateAndEditTrack">
+                                ✎ Moldear Trazo en Mapa
+                            </button>
+                            <button type="button" class="btn-secondary btn-xs" id="btnClearLineWaypoints" title="Enderezar trazos derecho a 90° o 180° según su orientación horizontal o vertical">
+                                ⚡ Enderezar Trazos (90° / 180°)
+                            </button>
+                        </div>
+                        <div class="route-add-row">
+                            <select id="addRouteStationSelect" class="form-control"></select>
+                            <button type="button" class="btn-secondary btn-xs" id="btnAddStationToRoute">+ Parada</button>
+                        </div>
+                        <div class="route-stops-list" id="lineRouteStopsList">
+                            <!-- Lista ordenable de estaciones del trayecto -->
+                        </div>
+                        <button type="button" class="btn-primary btn-block" id="btnSaveLineRoute">
+                            Guardar Trayecto de Paradas
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Formulario Editor de Estación -->
+                <form id="formEditStation" class="editor-form hidden">
+                    <div class="form-group">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label for="editStationSelect" style="margin-bottom:0; font-weight:600;">Seleccionar Estación</label>
+                            <button type="button" class="btn-secondary btn-xs" id="btnOpenNewStationFromEditor" style="color:var(--accent-blue); font-weight:600;">
+                                ＋ Nueva Estación
+                            </button>
+                        </div>
+                        <select id="editStationSelect" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStationName">Nombre de la Estación</label>
+                        <input type="text" id="editStationName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Terminal de Línea (Icono con Número al Lado)</label>
+                        <div id="editStationTerminalsGroup">
+                            <!-- Poblado dinámicamente con selector editable de líneas terminales -->
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Tags con Iconos a un Costado de la Estación</label>
+                        <div class="tag-toggle-grid" id="editStationTagsGroup">
+                            <!-- Poblado dinámicamente con los 6 tags oficiales -->
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="editStationInfra">Tipo de Construcción</label>
+                            <select id="editStationInfra" class="form-control">
+                                <option value="subterraneo">Subterráneo (Cajón / Trinchera)</option>
+                                <option value="tunel_profundo">Túnel Profundo (TBM + Lumbreras)</option>
+                                <option value="superficial">Superficial (Nivel de Calzada)</option>
+                                <option value="elevado">Viaducto Elevado</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editStationStatus">Estado Operativo</label>
+                            <select id="editStationStatus" class="form-control">
+                                <option value="operational">En Operación</option>
+                                <option value="construction">En Construcción</option>
+                                <option value="closed_permanent">Cerrada Permanentemente</option>
+                                <option value="expansion_planned">Ampliación Pendiente</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="editStationX">Coord. X (px)</label>
+                            <input type="number" id="editStationX" class="form-control tabular" step="0.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editStationY">Coord. Y (px)</label>
+                            <input type="number" id="editStationY" class="form-control tabular" step="0.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editStationDepth">Cota / Prof. (m)</label>
+                            <input type="number" id="editStationDepth" class="form-control tabular" step="0.5" required>
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="editStationPlatform">Disposición de Andenes</label>
+                            <select id="editStationPlatform" class="form-control">
+                                <option value="central">Andén Central (Isla)</option>
+                                <option value="lateral">Andenes Laterales (2 vías)</option>
+                                <option value="triple">Triple Andén (Alta Afluencia)</option>
+                                <option value="seis_andenes">Seis Andenes (Línea A: 2 Ord + 2 Prem + 2 Res)</option>
+                                <option value="brt_central">Plataforma Alta Confinada (Autobús Articulado)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editStationExits">Salidas Emergencia</label>
+                            <input type="number" id="editStationExits" class="form-control tabular" min="1" max="16">
+                        </div>
+                    </div>
+                    <div class="form-check-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="editStationPsd">
+                            <span>Puertas Automáticas de Andén (PSD / APG)</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="editStationPremium">
+                            <span>Parada Servicio Expreso Premium (Línea A)</span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn-primary btn-block">Guardar Cambios en Estación</button>
+                </form>
+
+                <!-- Formulario Editor de Polígonos de la Ciudad -->
+                <form id="formEditCity" class="editor-form hidden">
+                    <div class="form-group">
+                        <label for="editCitySelect">Polígono / Zona Geográfica</label>
+                        <select id="editCitySelect" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCityName">Nombre del Sector Urbano / Geográfico</label>
+                        <input type="text" id="editCityName" class="form-control" required>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="editCityColor">Color</label>
+                            <input type="color" id="editCityColor" class="form-control color-Swatch">
+                        </div>
+                        <div class="form-group">
+                            <label for="editCityOpacity">Opacidad</label>
+                            <input type="number" id="editCityOpacity" class="form-control tabular" min="0.02" max="0.8" step="0.02">
+                        </div>
+                        <div class="form-group">
+                            <label for="editCityElevation">Altitud (m s.n.m.)</label>
+                            <input type="number" id="editCityElevation" class="form-control tabular" step="1">
+                        </div>
+                    </div>
+                    <p class="form-hint">También puedes remodelar los vértices directamente en el mapa activando el botón <strong>Editar Cartografía</strong> en la barra superior.</p>
+                    <button type="submit" class="btn-primary btn-block">Actualizar Polígono Urbano</button>
+                </form>
+
+                <!-- Sub-panel Editor de Correspondencias y Transbordos -->
+                <div id="sectionEditCorrespondence" class="editor-form hidden">
+                    <form id="formEditCorrespondence">
+                        <div class="form-group">
+                            <label for="corrStationSelect">Estación a Conectar como Correspondencia</label>
+                            <select id="corrStationSelect" class="form-control" required></select>
+                            <p class="form-hint">Elige la estación de la lista o haz clic directamente sobre ella en el plano.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="corrTargetLineSelect">Línea Destino de la Correspondencia</label>
+                            <select id="corrTargetLineSelect" class="form-control" required></select>
+                            <p class="form-hint">No se permite conectar una estación con una línea a la que ya pertenezca.</p>
+                        </div>
+                        <button type="submit" class="btn-primary btn-block" id="btnSubmitAddCorrespondence">
+                            ⇄ Conectar como Transbordo
+                        </button>
+                    </form>
+                    <div class="route-editor-box" style="margin-top:14px;">
+                        <span class="section-eyebrow">ESTACIONES DE CORRESPONDENCIA EXISTENTES</span>
+                        <div class="corr-stations-list" id="corrStationsList" style="max-height:180px; overflow-y:auto; margin-top:6px;">
+                            <!-- Poblado dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Modal para Crear Alerta Manual en PCCO -->
+    <div class="modal-backdrop hidden" id="modalNewAlert" role="dialog" aria-modal="true" aria-labelledby="modalAlertTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalAlertTitle">Emitir Alerta Operativa PCCO</h3>
+                <button type="button" class="icon-btn" id="btnCloseAlertModal" aria-label="Cerrar ventana">✕</button>
+            </div>
+            <form id="formCreateAlert" class="modal-body">
+                <div class="form-group">
+                    <label for="newAlertTitle">Título de la Incidencia</label>
+                    <input type="text" id="newAlertTitle" class="form-control" placeholder="Ej. Regulación de intervalo por lluvia en tramo superficial" required>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newAlertLine">Línea Afectada</label>
+                        <select id="newAlertLine" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="newAlertSeverity">Nivel de Severidad</label>
+                        <select id="newAlertSeverity" class="form-control">
+                            <option value="warning">Preventiva (Marcha Reducida)</option>
+                            <option value="critical">Crítica (Seguridad / Interrupción)</option>
+                            <option value="info">Informativa (Obra / Evento)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newAlertCategory">Subsistema Técnico</label>
+                        <select id="newAlertCategory" class="form-control">
+                            <option value="signaling">Pilotaje Automático CBTC / Señalización</option>
+                            <option value="power">Subestación Rectificadora 750 VCC</option>
+                            <option value="rolling_stock">Material Rodante / Puertas PSD</option>
+                            <option value="weather">Drenaje Pluvial / Clima Severo</option>
+                            <option value="crowding">Saturación de Andén / Despacho en Vacío</option>
+                            <option value="civil">Obra Civil / Conflicto Territorial</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="newAlertSpeedFactor">Factor de Velocidad (0.2 a 1.0)</label>
+                        <input type="number" id="newAlertSpeedFactor" class="form-control tabular" min="0.1" max="1.0" step="0.05" value="0.75">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="newAlertDesc">Protocolo y Descripción Operativa</label>
+                    <textarea id="newAlertDesc" class="form-control" rows="2" required>Activación de regulación de tráfico desde el Puesto Central de Control.</textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelAlertModal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Activar Alerta en Red</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 1: Crear Nueva Estación -->
+    <div class="modal-backdrop hidden" id="modalNewStation" role="dialog" aria-modal="true" aria-labelledby="modalNewStationTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalNewStationTitle">＋ Nueva Estación en el Mapa</h3>
+                <button type="button" class="icon-btn" id="btnCloseNewStationModal" aria-label="Cerrar ventana">✕</button>
+            </div>
+            <form id="formCreateStationModal" class="modal-body">
+                <div class="form-group">
+                    <label for="newStationName">Nombre de la Estación</label>
+                    <input type="text" id="newStationName" class="form-control" placeholder="Ej. Jardines del Norte" required>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newStationX">Coordenada X (px)</label>
+                        <input type="number" id="newStationX" class="form-control tabular" step="0.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newStationY">Coordenada Y (px)</label>
+                        <input type="number" id="newStationY" class="form-control tabular" step="0.5" required>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newStationInfra">Tipo de Construcción</label>
+                        <select id="newStationInfra" class="form-control">
+                            <option value="subterraneo">Subterráneo (Cajón / Trinchera)</option>
+                            <option value="tunel_profundo">Túnel Profundo (TBM + Lumbreras)</option>
+                            <option value="superficial">Superficial (Nivel de Calzada)</option>
+                            <option value="elevado">Viaducto Elevado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="newStationStatus">Estado Operativo</label>
+                        <select id="newStationStatus" class="form-control">
+                            <option value="operational">En Operación Normal</option>
+                            <option value="construction">En Construcción</option>
+                            <option value="closed_permanent">Cerrada Permanentemente</option>
+                            <option value="expansion_planned">Ampliación Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label for="newStationInitialLine" style="margin-bottom:0;">Asignar a Línea Inicial (Opcional)</label>
+                        <button type="button" class="btn-secondary btn-xs" id="btnCreateLineFromStationModal" style="padding:2px 8px; font-size:11px;">＋ Crear Nueva Línea</button>
+                    </div>
+                    <select id="newStationInitialLine" class="form-control">
+                        <option value="">(Ninguna: estación independiente / huérfana)</option>
+                    </select>
+                    <p class="form-hint">Las estaciones huérfanas se muestran con contorno discontinuo neutral y pueden conectarse a cualquier línea después.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelNewStationModal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear Estación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Crear Nueva Línea -->
+    <div class="modal-backdrop hidden" id="modalNewLine" role="dialog" aria-modal="true" aria-labelledby="modalNewLineTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalNewLineTitle">＋ Crear Nueva Línea</h3>
+                <button type="button" class="icon-btn" id="btnCloseNewLineModal" aria-label="Cerrar ventana">✕</button>
+            </div>
+            <form id="formCreateLineModal" class="modal-body">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newLineCode">Código Oficial (Único)</label>
+                        <input type="text" id="newLineCode" class="form-control tabular" placeholder="Ej. 23, H, S6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newLineColor">Color Hexadecimal</label>
+                        <div class="color-input-group">
+                            <input type="color" id="newLineColorPicker" class="color-Swatch" value="#e11d48">
+                            <input type="text" id="newLineColor" class="form-control tabular" value="#E11D48" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="newLineName">Nombre Oficial de la Línea</label>
+                    <input type="text" id="newLineName" class="form-control" placeholder="Ej. Línea 23 (Expreso Oriente)" required>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newLineNetType">Tipología de Red</label>
+                        <select id="newLineNetType" class="form-control">
+                            <option value="metro">Metro (Convencional o Alimentadora)</option>
+                            <option value="bus_articulado">Red de Autobuses Articulados (BRT)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="newLineSubType">Subtipo</label>
+                        <select id="newLineSubType" class="form-control">
+                            <option value="convencional">Línea Convencional</option>
+                            <option value="alimentadora">Línea Alimentadora</option>
+                            <option value="bus_articulado">Sistema Auxiliar de Autobuses Articulados</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelNewLineModal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear Línea</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Conectar Tramo entre Estaciones -->
+    <div class="modal-backdrop hidden" id="modalNewSegment" role="dialog" aria-modal="true" aria-labelledby="modalNewSegmentTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalNewSegmentTitle">⤹ Conectar Tramo entre Estaciones</h3>
+                <button type="button" class="icon-btn" id="btnCloseNewSegmentModal" aria-label="Cerrar ventana">✕</button>
+            </div>
+            <form id="formCreateSegmentModal" class="modal-body">
+                <div class="form-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label for="newSegmentLineSelect" style="margin-bottom:0;">Línea</label>
+                        <button type="button" class="btn-secondary btn-xs" id="btnCreateLineFromSegmentModal" style="padding:2px 8px; font-size:11px;">＋ Crear Nueva Línea</button>
+                    </div>
+                    <select id="newSegmentLineSelect" class="form-control" required></select>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="newSegmentFromSelect">Estación Origen</label>
+                        <select id="newSegmentFromSelect" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="newSegmentToSelect">Estación Destino</label>
+                        <select id="newSegmentToSelect" class="form-control" required></select>
+                    </div>
+                </div>
+                <p class="form-hint">Se creará un tramo directo entre ambas paradas. Si ya existe conexión directa entre ellas en esa línea, el sistema lo rechazará para prevenir redundancias.</p>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelNewSegmentModal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Conectar Tramo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 4: Agregar Correspondencia / Transbordo -->
+    <div class="modal-backdrop hidden" id="modalNewCorrespondence" role="dialog" aria-modal="true" aria-labelledby="modalNewCorrTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalNewCorrTitle">⇄ Agregar Correspondencia (Transbordo)</h3>
+                <button type="button" class="icon-btn" id="btnCloseNewCorrModal" aria-label="Cerrar ventana">✕</button>
+            </div>
+            <form id="formCreateCorrModal" class="modal-body">
+                <div class="form-group">
+                    <label for="modalCorrStationSelect">Estación de Transferencia (Origen)</label>
+                    <select id="modalCorrStationSelect" class="form-control" required></select>
+                    <p class="form-hint" id="modalCorrStationLinesText">Líneas actuales: -</p>
+                </div>
+                <div class="form-group">
+                    <label for="modalCorrLineSelect">Línea a Conectar</label>
+                    <select id="modalCorrLineSelect" class="form-control" required></select>
+                    <p class="form-hint">No se permite conectar una estación a la misma línea que ya la opera (se rechazará como intra-línea).</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelNewCorrModal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Establecer Correspondencia</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Menú Contextual (Click Derecho) en el Mapa -->
+    <div id="metroContextMenu" class="metro-context-menu hidden" role="menu" aria-label="Acciones de mapa y red"></div>
+
+    <!-- Notificación Toast Flotante -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <!-- Librerías sin dependencias de pago: Leaflet + Motion One (Web Animations / Framer Motion API) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/motion@11.11.13/dist/motion.js"></script>
+    <script src="{% static 'network/js/app.js' %}"></script>
+</body>
+</html>

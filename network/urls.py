@@ -1,0 +1,33 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.index_view, name="index"),
+    path("api/network/", views.api_network_data, name="api_network_data"),
+    path("api/lines/<str:line_code>/update/", views.api_update_line, name="api_update_line"),
+    path("api/lines/<str:line_code>/route/", views.api_update_line_route, name="api_update_line_route"),
+    path("api/line-segments/<int:ls_id>/waypoints/", views.api_update_segment_waypoints, name="api_update_segment_waypoints"),
+    path("api/stations/<int:station_id>/update/", views.api_update_station, name="api_update_station"),
+    path("api/city-outlines/<int:outline_id>/update/", views.api_update_city_outline, name="api_update_city_outline"),
+    path("api/alerts/create/", views.api_create_alert, name="api_create_alert"),
+    path("api/alerts/simulate/", views.api_simulate_alert, name="api_simulate_alert"),
+    path("api/alerts/toggle/<int:alert_id>/", views.api_toggle_alert, name="api_toggle_alert_alt"),
+    path("api/alerts/<int:alert_id>/toggle/", views.api_toggle_alert, name="api_toggle_alert"),
+    path("api/stations/create/", views.api_create_station, name="api_create_station"),
+    path("api/stations/<int:station_id>/delete/", views.api_delete_station, name="api_delete_station"),
+    path("api/lines/create/", views.api_create_line, name="api_create_line"),
+    path("api/line-segments/create/", views.api_create_line_segment, name="api_create_line_segment"),
+    path("api/correspondences/create/", views.api_create_correspondence, name="api_create_correspondence"),
+    path("api/correspondences/remove/", views.api_create_correspondence, name="api_remove_correspondence"),
+    path("api/correspondences/", views.api_create_correspondence, name="api_create_correspondence_root"),
+    path("api/editor/save/", views.api_save_user_edits, name="api_save_user_edits"),
+    path("api/user-edits/save/", views.api_save_user_edits, name="api_user_edits_save"),
+    path("api/editor/discard/", views.api_discard_user_edits, name="api_discard_user_edits"),
+    path("api/user-edits/discard/", views.api_discard_user_edits, name="api_user_edits_discard"),
+    path("api/editor/status/", views.api_editor_status, name="api_editor_status"),
+    path("api/editor-status/", views.api_editor_status, name="api_editor_status_alt"),
+    path("api/network/reset/", views.api_reset_network, name="api_reset_network"),
+    path("api/cartografia/json/", views.api_cartografia_json, name="api_cartografia_json"),
+    path("api/cartografia/svg/", views.api_cartografia_svg, name="api_cartografia_svg"),
+    path("api/cartografia/logo/", views.api_cartografia_logo, name="api_cartografia_logo"),
+]

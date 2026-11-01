@@ -1,0 +1,4526 @@
+{
+  "version": 1,
+  "created_stations": [
+    {
+      "code": "estacion-u-9c3c0308",
+      "name": "Estación Ficticia Parque Oriente",
+      "x": 3200.0,
+      "y": 1500.0,
+      "lat": 19.479955,
+      "lng": -98.949286,
+      "infrastructure_type": "elevado",
+      "operational_status": "operational",
+      "depth_meters": -10.0,
+      "platform_type": "central",
+      "platform_count": 2,
+      "has_psd": true,
+      "is_transfer": false,
+      "is_terminal": false,
+      "is_premium_stop": false,
+      "icon_tags": [],
+      "terminal_lines": [],
+      "is_user_created": true,
+      "is_custom_modified": false
+    }
+  ],
+  "modified_stations": [],
+  "created_lines": [],
+  "modified_lines": [],
+  "route_overrides": {
+    "10": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-rio-tiber",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "10/A"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-alesna",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.782,
+        "waypoints": [
+          [
+            1163.2,
+            2019.5
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-alfonso-cano",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 3.564,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-jose-marti",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 5.346,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-ciencias-fisicas",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 7.128,
+        "waypoints": [],
+        "correspondences_text": "10/S3"
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-la-almudena",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 8.52,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-noche-triste",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 9.912,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-victor-de-montaigne",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 11.304,
+        "waypoints": [],
+        "correspondences_text": "10/13/18"
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-el-pipila",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 13.086,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-heroes-de-nacozari",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 14.868,
+        "waypoints": [
+          [
+            1641.6,
+            2497.9
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-antonio-ponz",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 16.65,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-margarita-nelken",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 18.432,
+        "waypoints": [],
+        "correspondences_text": "10/20"
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-berastegui",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 19.909,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-versalles",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 21.386,
+        "waypoints": [],
+        "correspondences_text": "10/B"
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-emilio-ferrari",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 22.862,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-las-torres",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 24.339,
+        "waypoints": [],
+        "correspondences_text": "2/7/10/16"
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-virgen-de-la-oliva",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 25.816,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-fortin",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 27.292,
+        "waypoints": [],
+        "correspondences_text": "10/S5"
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-ramon-vizcaino",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 28.769,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-plaza-roja",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 30.246,
+        "waypoints": [],
+        "correspondences_text": "10/15"
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-allende",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 31.722,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-poetisa-handuna",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 33.199,
+        "waypoints": [],
+        "correspondences_text": "9/10"
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-palermo",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 34.676,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-archivo-de-la-nacion",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 36.153,
+        "waypoints": [],
+        "correspondences_text": "6/10"
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-el-caracol",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 37.629,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-parque-de-las-fuentes",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 39.106,
+        "waypoints": [],
+        "correspondences_text": "10/11"
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-san-rosendo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 41.194,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 27,
+        "branch": "main",
+        "station_code": "estacion-orfeo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 43.282,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 28,
+        "branch": "main",
+        "station_code": "estacion-acuario-stellaria",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 45.37,
+        "waypoints": [],
+        "correspondences_text": "10/12"
+      },
+      {
+        "sequence": 29,
+        "branch": "main",
+        "station_code": "estacion-velazquez-bosco",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 46.414,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 30,
+        "branch": "main",
+        "station_code": "estacion-blasco-ibanez",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 47.458,
+        "waypoints": [],
+        "correspondences_text": "10/A"
+      },
+      {
+        "sequence": 31,
+        "branch": "main",
+        "station_code": "estacion-real-plaza",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 48.502,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 32,
+        "branch": "main",
+        "station_code": "estacion-villa-de-cuenca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 49.546,
+        "waypoints": [],
+        "correspondences_text": "10/19"
+      },
+      {
+        "sequence": 33,
+        "branch": "main",
+        "station_code": "estacion-salinas-moreau",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 51.226,
+        "waypoints": [
+          [
+            3395.7,
+            2019.5
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 34,
+        "branch": "main",
+        "station_code": "estacion-francisco-de-sales",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 52.906,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 35,
+        "branch": "main",
+        "station_code": "estacion-talamantes",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 54.586,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "12": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-alameda-oriente",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "12/A/E"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-gran-presa",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.044,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-acuario-stellaria",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.088,
+        "waypoints": [],
+        "correspondences_text": "10/12"
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-tenistas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 3.768,
+        "waypoints": [
+          [
+            3076.8,
+            2178.9
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-leneros",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 5.448,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-arcentales",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 7.128,
+        "waypoints": [],
+        "correspondences_text": "12/17"
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-motolinia",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 8.605,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-magallanes",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 10.081,
+        "waypoints": [],
+        "correspondences_text": "6/12"
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-ferreira",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 11.558,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-la-alhambra",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 13.035,
+        "waypoints": [],
+        "correspondences_text": "9/12"
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-bellas-artes",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 14.512,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-fray-servando",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 15.988,
+        "waypoints": [],
+        "correspondences_text": "12/15/S5"
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-instituto-cultural",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 16.972,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-medisur",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 17.956,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-auverna",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 18.94,
+        "waypoints": [],
+        "correspondences_text": "2/12"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-guerrero",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 19.924,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-ramon-y-cajal",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 20.908,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-olimpia",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 21.892,
+        "waypoints": [],
+        "correspondences_text": "7/12"
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-victor-hugo",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 23.369,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-artemisa",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 24.845,
+        "waypoints": [],
+        "correspondences_text": "12/B"
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-uaa-iv",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 26.322,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-panteones",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "operational",
+        "depth_meters": -12.0,
+        "chainage_km": 27.799,
+        "waypoints": [],
+        "correspondences_text": "12/18/20"
+      }
+    ],
+    "14": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-el-dorado",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "13/14"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-arroyo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 1.476,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-hospital-universitario",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 2.953,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-senor-de-la-ascension",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 4.43,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-san-benito",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 5.907,
+        "waypoints": [],
+        "correspondences_text": "6/14"
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-puebla",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 7.587,
+        "waypoints": [
+          [
+            2917.3,
+            1222.1
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-magnolia",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 9.267,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-fortaleza",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 10.947,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-bugambilias",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 12.627,
+        "waypoints": [
+          [
+            3076.8,
+            1381.6
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-corregidora",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 14.307,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-lanteri",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 15.987,
+        "waypoints": [],
+        "correspondences_text": "3/14"
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-ninfas",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 17.464,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-forum-monarca",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 18.941,
+        "waypoints": [],
+        "correspondences_text": "14/S2"
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-ucm-ix",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 20.417,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-instituto-de-artes",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 21.894,
+        "waypoints": [],
+        "correspondences_text": "5/14"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-jiron",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 23.371,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-montecarmelo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 24.847,
+        "waypoints": [],
+        "correspondences_text": "14/19"
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-la-palapa",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 26.239,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-pisagua",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 27.631,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-morelos-oriente",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 29.023,
+        "waypoints": [],
+        "correspondences_text": "5/14/A"
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-rancho-viejo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 30.415,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-apanco",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 31.807,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-libertad",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 33.199,
+        "waypoints": [],
+        "correspondences_text": "14/S2"
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-terraza-real",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 34.971,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-varela",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 36.743,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-aztacalco",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 38.515,
+        "waypoints": [
+          [
+            3395.7,
+            1381.6
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-pescadores",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 40.287,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 27,
+        "branch": "main",
+        "station_code": "estacion-alejandria",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 42.059,
+        "waypoints": [],
+        "correspondences_text": "14/A"
+      }
+    ],
+    "18": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-santa-monica",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "1/4/7/15/18"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-residencias-sur",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 1.044,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-campus-poniente",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 2.088,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-universidad-sur",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 3.132,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-tunel-emisor",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 4.176,
+        "waypoints": [],
+        "correspondences_text": "18/B"
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-sierra-norte",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 5.22,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-rio-seco",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 6.264,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-laforet",
+        "segment_infrastructure": "subterraneo",
+        "segment_status": "construction",
+        "depth_meters": -12.0,
+        "chainage_km": 7.308,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-panteones",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 8.352,
+        "waypoints": [],
+        "correspondences_text": "12/18/20"
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-el-pilar",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 9.744,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-venus",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 11.136,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-riobamba",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 12.528,
+        "waypoints": [],
+        "correspondences_text": "11/18"
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-rio-colorado",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 13.512,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-papaloapan",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 14.496,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-victor-de-montaigne",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 15.48,
+        "waypoints": [],
+        "correspondences_text": "10/13/18"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-sauces",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 16.956,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-laguna-de-patos",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 18.433,
+        "waypoints": [],
+        "correspondences_text": "18/S3"
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-ojo-de-liebre",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 19.91,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-canada",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 21.386,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-gaite",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 22.863,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-ojo-de-agua",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 24.34,
+        "waypoints": [],
+        "correspondences_text": "18/A"
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-frida-kahlo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 26.377,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-la-divina",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 28.414,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-santa-teresa",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 30.451,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-cuitzeo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 32.488,
+        "waypoints": [
+          [
+            684.8,
+            2657.3
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-girasoles",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 34.525,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-la-montserrat",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 36.562,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 27,
+        "branch": "main",
+        "station_code": "estacion-sayula",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 38.599,
+        "waypoints": [],
+        "correspondences_text": "18/21"
+      },
+      {
+        "sequence": 28,
+        "branch": "main",
+        "station_code": "estacion-tic-ti",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 40.568,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 29,
+        "branch": "main",
+        "station_code": "estacion-brunel",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 42.537,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 30,
+        "branch": "main",
+        "station_code": "estacion-poligono-xi",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 44.506,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 31,
+        "branch": "main",
+        "station_code": "estacion-faraday",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 46.475,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 32,
+        "branch": "main",
+        "station_code": "estacion-poligono-x",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 48.444,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 33,
+        "branch": "main",
+        "station_code": "estacion-dalia",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 50.413,
+        "waypoints": [],
+        "correspondences_text": "18/22"
+      }
+    ],
+    "21": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-albufera",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "21/C"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-aldea-real",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.462,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-distribuidora",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.924,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-carlos-latorre",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 4.386,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-miguel-grau",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 5.848,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-pablo-moncayo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 7.31,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-hilanderia",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 8.772,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-miguel-servet",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 10.234,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-esi",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 11.696,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-juan-de-dios",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 13.158,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-ministerio-de-parques",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 14.62,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-carcamo-de-bombeo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 16.082,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-lopez-de-hoyos",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 17.544,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-proteccion-civil",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 19.006,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-tecnica-155",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 20.468,
+        "waypoints": [
+          [
+            525.4,
+            2816.8
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-velodromo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 21.93,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-estadio-olimpico",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 23.392,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-sayula",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 24.854,
+        "waypoints": [],
+        "correspondences_text": "18/21"
+      }
+    ],
+    "22": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-dalia",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "18/22"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-polideportivo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 1.477,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-poligono",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 2.954,
+        "waypoints": [],
+        "correspondences_text": "22/C"
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-el-llano",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 4.43,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-angeles",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 5.907,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-parque-de-los-patos",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 7.384,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-hispanidad",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 8.86,
+        "waypoints": [],
+        "correspondences_text": "22/C"
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-mar-de-cristal",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 10.337,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-mendizabal",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 11.814,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-calle-de-las-manzanas",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 13.291,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-meliloto",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 14.767,
+        "waypoints": [],
+        "correspondences_text": "20/22"
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-ministerio-de-seguridad",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 16.244,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-instituto-de-la-juventud",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 17.721,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-felipe-salvador",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 19.197,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-alvear",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 20.674,
+        "waypoints": [],
+        "correspondences_text": "15/22"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-baleares",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 22.586,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-rodrigo-de-castellan",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 24.498,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-bosque-de-la-villa",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 26.41,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-el-canalillo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 28.322,
+        "waypoints": [
+          [
+            2598.4,
+            3295.2
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-ankara",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 30.234,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-alsacia",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 32.147,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-lopez-otero",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 34.059,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-residencias",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 35.971,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-isabel-de-villena",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 37.883,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "C": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-cardonal",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-cerro",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 1.363,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-san-lorenzo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 2.726,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-san-lorenzo-tlacotepec",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 4.089,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-san-blas",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 5.452,
+        "waypoints": [
+          [
+            525.4,
+            1062.7
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-jazmin",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 6.815,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-azucenas",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 8.178,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-el-clavelero",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 9.541,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-xinaxtla",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 10.904,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-villaclara",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 12.267,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-amaneceres",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 13.63,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-agrarismo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 14.993,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-la-amistad",
+        "segment_infrastructure": "elevado",
+        "segment_status": "closed_permanent",
+        "depth_meters": 9.5,
+        "chainage_km": 16.356,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-albufera",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 17.719,
+        "waypoints": [],
+        "correspondences_text": "21/C"
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-moyotlan",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 20.609,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-3-de-mayo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 23.499,
+        "waypoints": [
+          [
+            206.4,
+            2019.5
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-el-metate",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 26.389,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-15d-oriente",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 29.279,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-maria-bonita",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 32.169,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-ocotzol",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 35.059,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-politecnico",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 37.949,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-esed",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 40.839,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-mixtiu",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 43.729,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-arboledas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 46.619,
+        "waypoints": [
+          [
+            525.4,
+            3135.7
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-shomeje",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 49.509,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-santo-domingo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 52.399,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-malinalli",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 55.289,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 27,
+        "branch": "main",
+        "station_code": "estacion-dolores",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 58.179,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 28,
+        "branch": "main",
+        "station_code": "estacion-adoquin",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 61.069,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 29,
+        "branch": "main",
+        "station_code": "estacion-poligono",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 63.959,
+        "waypoints": [],
+        "correspondences_text": "22/C"
+      },
+      {
+        "sequence": 30,
+        "branch": "main",
+        "station_code": "estacion-bamba",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 66.047,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 31,
+        "branch": "main",
+        "station_code": "estacion-hispanidad",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 68.135,
+        "waypoints": [],
+        "correspondences_text": "22/C"
+      },
+      {
+        "sequence": 32,
+        "branch": "main",
+        "station_code": "estacion-montero-segovia",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 70.223,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 33,
+        "branch": "main",
+        "station_code": "estacion-tlacotepec",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 72.311,
+        "waypoints": [],
+        "correspondences_text": "C/G"
+      }
+    ],
+    "D": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-el-peregrino",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "8/A/D"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-quinto-sol",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.501,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-todos-los-santos",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 3.002,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-san-juan-de-los-jarros",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 4.503,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-los-jarros",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 6.004,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-heroes-de-reforma",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 7.505,
+        "waypoints": [
+          [
+            1163.2,
+            584.3
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-francisco-zarco",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 9.006,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-comunal",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 10.507,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-luis-bleriot",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 12.008,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-oriente-140",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 13.509,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-ontario",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 15.01,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-cantu",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 16.511,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-mario-bellatin",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 18.012,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-leopoldo-velasco",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 19.513,
+        "waypoints": [
+          [
+            525.4,
+            584.3
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-cuvier",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 21.014,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-crisantema",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 22.515,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-gustavo-baz",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 24.016,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-guadalupe-tecoac",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 25.517,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-coquimbo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 27.018,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-rincon-de-la-candelaria",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 28.519,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "E": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-alameda-oriente",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "12/A/E"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-escobedo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.181,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-la-rosa",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.362,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-rincon",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 3.543,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-abasolo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 4.724,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-uhagon",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 5.905,
+        "waypoints": [],
+        "correspondences_text": "19/E"
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-parque-de-las-animas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 7.339,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-mirador-de-las-animas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 8.773,
+        "waypoints": [
+          [
+            3714.6,
+            2338.4
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-laguna-grande",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 10.207,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-atotonilco",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 11.641,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-cananea",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 13.075,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-23-de-abril",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 14.509,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-la-espiga",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 15.943,
+        "waypoints": [
+          [
+            4033.6,
+            2657.3
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-san-pedro",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 17.377,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-llanura",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 18.811,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-blvd-san-andres",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 20.245,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-panama",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 21.679,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-acutzilapan",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 23.113,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "F": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-rosario",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "6/A/F"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-el-rosario",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.392,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-industrial-rosario-norte",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.784,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-ceylan",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 4.176,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-el-caporal",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 5.568,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-5-de-mayo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 6.96,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-industrial-rosario",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 8.352,
+        "waypoints": [],
+        "correspondences_text": "F/S4"
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-coliseum",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 9.903,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-cuartel-general-aas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 11.454,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-centro-investigaciones",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 13.005,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-aas-iii",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 14.556,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-el-ruisenor",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 16.107,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-zapote",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 17.658,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-kahlo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 19.209,
+        "waypoints": [
+          [
+            3714.6,
+            584.3
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-san-ignacio-de-loyola",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 20.76,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-temazcales",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 22.311,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-la-joya",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 23.862,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-santiago-acutzilapan",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 25.413,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-santiago-apostol",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 26.964,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-panteon-municipal",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 28.515,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "G": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-tlacotepec",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "C/G"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-ciudad-deportiva",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 1.731,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-opalo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 3.462,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-patio-tlacotepec",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 5.193,
+        "waypoints": [
+          [
+            1641.6,
+            3773.6
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-villa-hermosa",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 6.924,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-el-espejel",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 8.655,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-15d-poniente",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 10.386,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-montealto",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 12.117,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-rivera-del-rio",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 13.848,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-eterna-primavera",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 15.579,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-chamizal",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 17.31,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-la-quebrada",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 19.041,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-manto-del-rio",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 20.772,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-ahuizotl",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 22.503,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-puente-viejo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 24.234,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-los-reyes",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 25.965,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-jardines",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 27.696,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-tandaro",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 29.427,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-pueblo-bajo",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 31.158,
+        "waypoints": [
+          [
+            3076.8,
+            3773.6
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-segundo-barrio",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 32.889,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-agustin-milan",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 34.62,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-veneto",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 36.351,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-san-pedro-apostol",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 38.082,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-rio-moron",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 39.813,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-carlos-hank",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 41.544,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-dos-caminos",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 43.275,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-inmaculada",
+        "segment_infrastructure": "elevado",
+        "segment_status": "operational",
+        "depth_meters": 9.5,
+        "chainage_km": 45.006,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "S1": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-calz-santa-monica",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "S1/S3"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-blvd-aeropuerto",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.984,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-resendiz",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.968,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-camargo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.952,
+        "waypoints": [],
+        "correspondences_text": "13/S1"
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-casa-vieja",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 4.133,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-blanca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 5.314,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-torres-31",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 6.495,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-fuentecita",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 7.676,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-penalba",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 8.857,
+        "waypoints": [],
+        "correspondences_text": "20/B/S1"
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-el-potrillo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 9.841,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-tepetitlan-poniente",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 10.825,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-hangares",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 11.809,
+        "waypoints": [],
+        "correspondences_text": "4/S1"
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-ciruelos",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 12.793,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-club-de-leones",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 13.777,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-la-orquidea",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 14.761,
+        "waypoints": [],
+        "correspondences_text": "3/S1"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-botica",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 15.745,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-ciudad-comercial",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 16.729,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-bosque-encantado",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 17.713,
+        "waypoints": [],
+        "correspondences_text": "8/S1"
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-central-norte",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 18.697,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-estancias-infantiles",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 19.681,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-pleyades",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 20.665,
+        "waypoints": [],
+        "correspondences_text": "13/S1"
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-praviana",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 22.142,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-ceip-san-juan",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 23.619,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-perinatal",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 25.095,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-homero",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 26.572,
+        "waypoints": [],
+        "correspondences_text": "7/S1"
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-plaza-de-la-tecnologia",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 28.049,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-el-torito",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 29.525,
+        "waypoints": [],
+        "correspondences_text": "2/S1"
+      },
+      {
+        "sequence": 27,
+        "branch": "main",
+        "station_code": "estacion-dorado-ii",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 31.297,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 28,
+        "branch": "main",
+        "station_code": "estacion-del-trabajo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 33.069,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 29,
+        "branch": "main",
+        "station_code": "estacion-plaza-trabajadores",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 34.841,
+        "waypoints": [
+          [
+            2598.4,
+            1062.7
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 30,
+        "branch": "main",
+        "station_code": "estacion-medicos-nacionales",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 36.613,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 31,
+        "branch": "main",
+        "station_code": "estacion-angela-figuera",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 38.385,
+        "waypoints": [],
+        "correspondences_text": "A/S1"
+      },
+      {
+        "sequence": 32,
+        "branch": "main",
+        "station_code": "estacion-fresnedo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 39.862,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 33,
+        "branch": "main",
+        "station_code": "estacion-continentes",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 41.338,
+        "waypoints": [],
+        "correspondences_text": ""
+      }
+    ],
+    "S3": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-amores",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "A/S3"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-colegio-militar",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.044,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-escamilla-78",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.088,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-sirio",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 3.132,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-naturalismo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 4.176,
+        "waypoints": [],
+        "correspondences_text": "3/S3"
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-moreto",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 5.568,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-menendez",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 6.96,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-calz-santa-monica",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 8.352,
+        "waypoints": [],
+        "correspondences_text": "S1/S3"
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-manuel-maria",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 9.336,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-leo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 10.32,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-felipe-escamilla",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 11.304,
+        "waypoints": [],
+        "correspondences_text": "1/S3"
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-aeronautica",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 12.781,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-ganivet",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 14.257,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-parque-del-retiro",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 15.734,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-ciencias-fisicas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 17.211,
+        "waypoints": [],
+        "correspondences_text": "10/S3"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-club-de-golf",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 18.195,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-plateria",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 19.179,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-laguna-de-patos",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 20.163,
+        "waypoints": [],
+        "correspondences_text": "18/S3"
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-las-letras",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 21.589,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-fucar",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 23.015,
+        "waypoints": [
+          [
+            1322.7,
+            2497.9
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-muriel",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 24.441,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-pueblo-de-la-cuenca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 25.867,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-angel-llorca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 27.293,
+        "waypoints": [],
+        "correspondences_text": "13/S3"
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-felipe-villanueva",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 28.685,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-calvarios",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 30.077,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-greta",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 31.469,
+        "waypoints": [],
+        "correspondences_text": "A/S3"
+      }
+    ],
+    "S4": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-ciudad-azteca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "A/B/S4"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-casa-real",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 1.284,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-estrella-del-norte",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 2.568,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-oca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 3.852,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-el-puente",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 5.136,
+        "waypoints": [
+          [
+            1801.1,
+            584.3
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-pantera",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 6.42,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-vitrales",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 7.704,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-marte",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 8.988,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-plaza-clarume",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 10.272,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-dulce-rojo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 11.556,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-rositas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 12.84,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-el-paso",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 14.124,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-del-norte",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 15.408,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-plaza-de-la-luz",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 16.692,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-las-penas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 17.976,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-claveles",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 19.26,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-arenas-del-rey",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 20.544,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-platon",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 21.828,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-laboratorios",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 23.112,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-opel-corsa",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 24.396,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-talleres",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 25.68,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-fernando-de-alva",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 26.964,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-san-de-guzman",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 28.248,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-industrial-rosario",
+        "segment_infrastructure": "superficial",
+        "segment_status": "operational",
+        "depth_meters": 0.0,
+        "chainage_km": 29.532,
+        "waypoints": [],
+        "correspondences_text": "F/S4"
+      }
+    ],
+    "S5": [
+      {
+        "sequence": 0,
+        "branch": "main",
+        "station_code": "estacion-hidalgo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 0.0,
+        "waypoints": [],
+        "correspondences_text": "1/2/S5"
+      },
+      {
+        "sequence": 1,
+        "branch": "main",
+        "station_code": "estacion-heroes-de-la-nacion",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 1.044,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 2,
+        "branch": "main",
+        "station_code": "estacion-vista-alegre",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 2.088,
+        "waypoints": [],
+        "correspondences_text": "8/S5"
+      },
+      {
+        "sequence": 3,
+        "branch": "main",
+        "station_code": "estacion-villas-de-kassiane",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 3.341,
+        "waypoints": [
+          [
+            2438.9,
+            1700.5
+          ]
+        ],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 4,
+        "branch": "main",
+        "station_code": "estacion-calz-de-las-estrellas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 4.594,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 5,
+        "branch": "main",
+        "station_code": "estacion-calz-la-mora",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 5.847,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 6,
+        "branch": "main",
+        "station_code": "estacion-mora-sur",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 7.1,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 7,
+        "branch": "main",
+        "station_code": "estacion-el-jardin",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 8.353,
+        "waypoints": [],
+        "correspondences_text": "1/S5"
+      },
+      {
+        "sequence": 8,
+        "branch": "main",
+        "station_code": "estacion-entronque-asura",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 9.337,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 9,
+        "branch": "main",
+        "station_code": "estacion-los-pastores",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 10.321,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 10,
+        "branch": "main",
+        "station_code": "estacion-estrellas",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 11.305,
+        "waypoints": [],
+        "correspondences_text": "8/9/19/S5"
+      },
+      {
+        "sequence": 11,
+        "branch": "main",
+        "station_code": "estacion-reyes",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 12.349,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 12,
+        "branch": "main",
+        "station_code": "estacion-unamuno-i",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 13.393,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 13,
+        "branch": "main",
+        "station_code": "estacion-seminario-menor",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 14.437,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 14,
+        "branch": "main",
+        "station_code": "estacion-fray-servando",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 15.481,
+        "waypoints": [],
+        "correspondences_text": "12/15/S5"
+      },
+      {
+        "sequence": 15,
+        "branch": "main",
+        "station_code": "estacion-guadalupe-hidalgo",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 16.525,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 16,
+        "branch": "main",
+        "station_code": "estacion-victoria",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 17.569,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 17,
+        "branch": "main",
+        "station_code": "estacion-plaza-bambu",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 18.613,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 18,
+        "branch": "main",
+        "station_code": "estacion-chabacano",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 19.657,
+        "waypoints": [],
+        "correspondences_text": "2/11/S5"
+      },
+      {
+        "sequence": 19,
+        "branch": "main",
+        "station_code": "estacion-encomienda-de-los-palacios",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 20.641,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 20,
+        "branch": "main",
+        "station_code": "estacion-artajona",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 21.625,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 21,
+        "branch": "main",
+        "station_code": "estacion-fortin",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 22.609,
+        "waypoints": [],
+        "correspondences_text": "10/S5"
+      },
+      {
+        "sequence": 22,
+        "branch": "main",
+        "station_code": "estacion-semsa",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 24.086,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 23,
+        "branch": "main",
+        "station_code": "estacion-artilleros",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 25.563,
+        "waypoints": [],
+        "correspondences_text": "16/S5"
+      },
+      {
+        "sequence": 24,
+        "branch": "main",
+        "station_code": "estacion-sierra-dorada",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 27.039,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 25,
+        "branch": "main",
+        "station_code": "estacion-vasco-de-quiroga",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 28.516,
+        "waypoints": [],
+        "correspondences_text": "15/A/S5"
+      },
+      {
+        "sequence": 26,
+        "branch": "main",
+        "station_code": "estacion-dore",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 29.993,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 27,
+        "branch": "main",
+        "station_code": "estacion-la-trinidad",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 31.469,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 28,
+        "branch": "main",
+        "station_code": "estacion-sierra-blanca",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 32.945,
+        "waypoints": [],
+        "correspondences_text": ""
+      },
+      {
+        "sequence": 29,
+        "branch": "main",
+        "station_code": "estacion-aeropuerto-alvarez-morisot",
+        "segment_infrastructure": "superficial",
+        "segment_status": "construction",
+        "depth_meters": 0.0,
+        "chainage_km": 34.422,
+        "waypoints": [],
+        "correspondences_text": "15/S5"
+      }
+    ]
+  }
+}

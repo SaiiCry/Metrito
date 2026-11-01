@@ -1,0 +1,9 @@
+{
+  "name": "metrito-tests",
+  "version": "1.0.0",
+  "description": "Pruebas de frontend para el editor de trazado de red SMyT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests_frontend/test_network_store.mjs"
+  }
+}

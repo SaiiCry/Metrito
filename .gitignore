@@ -1,0 +1,30 @@
+# Python / Entorno virtual
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node & Frontend dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Secretos y variables de entorno
+.env
+.env.*
+*.pem
+*.key
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -636,15 +636,7 @@
 
                 <!-- Formulario Editor de Estación -->
                 <form id="formEditStation" class="editor-form hidden">
-                    <div class="form-group">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <label for="editStationSelect" style="margin-bottom:0; font-weight:600;">Seleccionar Estación</label>
-                            <button type="button" class="btn-secondary btn-xs" id="btnOpenNewStationFromEditor" style="color:var(--accent-blue); font-weight:600;">
-                                ＋ Nueva Estación
-                            </button>
-                        </div>
-                        <select id="editStationSelect" class="form-control"></select>
-                    </div>
+                    <input type="hidden" id="editStationId" value="">
                     <div class="form-group">
                         <label for="editStationName">Nombre de la Estación</label>
                         <input type="text" id="editStationName" class="form-control" required>

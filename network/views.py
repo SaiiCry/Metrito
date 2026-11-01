@@ -1082,6 +1082,8 @@ def api_delete_station(request, station_id):
     """
     station = get_object_or_404(Station, id=station_id)
     station_name = station.name
+    station_code = station.code
+    st_id_val = station.id
 
     with transaction.atomic():
         affected_line_ids = list(LineStation.objects.filter(station=station).values_list("line_id", flat=True).distinct())
@@ -1102,7 +1104,7 @@ def api_delete_station(request, station_id):
 
         station.delete()
 
-    export_user_network_layer()
+    export_user_network_layer(deleted_station_code=station_code, deleted_station_id=st_id_val)
     return JsonResponse({
         "ok": True,
         "deleted": True,

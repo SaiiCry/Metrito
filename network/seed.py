@@ -499,7 +499,7 @@ def seed_database(force_reset: bool = False) -> Dict[str, Any]:
     }
 
 
-def export_user_network_layer() -> Dict[str, Any]:
+def export_user_network_layer(deleted_station_code: str = None, deleted_station_id: int = None) -> Dict[str, Any]:
     """
     Serializa todas las adiciones y modificaciones realizadas por el usuario:
     - Estaciones creadas (is_user_created=True) y modificadas (is_custom_modified=True)
@@ -614,6 +614,15 @@ def export_user_network_layer() -> Dict[str, Any]:
                 for ls in line_stops
             ]
 
+    global _cached_deleted_stations
+    if "_cached_deleted_stations" not in globals():
+        _cached_deleted_stations = set()
+    if deleted_station_code:
+        _cached_deleted_stations.add(str(deleted_station_code))
+    if deleted_station_id:
+        _cached_deleted_stations.add(str(deleted_station_id))
+    existing_deleted = list(_cached_deleted_stations)
+
     layer_payload = {
         "version": 1,
         "created_stations": created_stations,
@@ -621,6 +630,7 @@ def export_user_network_layer() -> Dict[str, Any]:
         "created_lines": created_lines,
         "modified_lines": modified_lines,
         "route_overrides": route_overrides,
+        "deleted_stations": existing_deleted,
     }
 
     # Guardar en SQLite (modelo UserNetworkEditLayer)
@@ -673,6 +683,12 @@ def apply_user_network_layer(layer_data: Dict[str, Any] = None) -> Dict[str, Any
     applied_lines = 0
 
     with transaction.atomic():
+        # 0. Eliminar estaciones borradas por el usuario
+        for code_or_id in layer_data.get("deleted_stations", []):
+            Station.objects.filter(code=str(code_or_id)).delete()
+            if str(code_or_id).isdigit():
+                Station.objects.filter(id=int(code_or_id)).delete()
+
         # 1. Crear estaciones de usuario
         for s_data in layer_data.get("created_stations", []):
             st, _ = Station.objects.update_or_create(

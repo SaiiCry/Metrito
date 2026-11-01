@@ -201,9 +201,17 @@
         getStoredEdits() {
             try {
                 const raw = localStorage.getItem(this.STORAGE_KEY);
-                return raw ? JSON.parse(raw) : { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {} };
+                const obj = raw ? JSON.parse(raw) : null;
+                return {
+                    stations: obj?.stations || {},
+                    lines: obj?.lines || {},
+                    createdStations: Array.isArray(obj?.createdStations) ? obj.createdStations : [],
+                    createdLines: Array.isArray(obj?.createdLines) ? obj.createdLines : [],
+                    cityOutlines: obj?.cityOutlines || {},
+                    deletedStations: Array.isArray(obj?.deletedStations) ? obj.deletedStations : []
+                };
             } catch (e) {
-                return { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {} };
+                return { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {}, deletedStations: [] };
             }
         },
 
@@ -257,6 +265,30 @@
             const edits = this.getStoredEdits();
             if (!edits) return false;
             let applied = false;
+
+            // 0. Eliminar estaciones borradas por el usuario
+            if (Array.isArray(edits.deletedStations) && edits.deletedStations.length > 0) {
+                const deletedSet = new Set(edits.deletedStations.map(Number));
+                const prevCount = NetworkStore.stations.length;
+                NetworkStore.stations = NetworkStore.stations.filter(s => !deletedSet.has(Number(s.id)));
+                for (const delId of deletedSet) {
+                    NetworkStore.stationsById.delete(delId);
+                }
+                for (const ln of NetworkStore.lines) {
+                    if (Array.isArray(ln.stops)) {
+                        const prevStops = ln.stops.length;
+                        ln.stops = ln.stops.filter(s => !deletedSet.has(Number(s.station_id)));
+                        if (ln.stops.length !== prevStops) {
+                            ln.stops.forEach((s, idx) => { s.sequence = idx; });
+                            ln.declared_stations_count = ln.stops.length;
+                        }
+                    }
+                }
+                if (NetworkStore.stations.length !== prevCount) {
+                    NetworkStore.sortedStations = [...NetworkStore.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
+                    applied = true;
+                }
+            }
 
             // 1. Estaciones creadas por el usuario
             if (Array.isArray(edits.createdStations)) {
@@ -612,16 +644,31 @@
                     if (Array.isArray(ln.stops)) {
                         ln.stops = ln.stops.filter(s => s.station_id !== stId);
                         ln.stops.forEach((s, idx) => { s.sequence = idx; });
+                        ln.declared_stations_count = ln.stops.length;
                     }
                 }
 
                 if (updateStorage) {
-                    edits.createdStations = edits.createdStations.filter(s => s.id !== stId);
-                    delete edits.stations[stId];
+                    if (!Array.isArray(edits.deletedStations)) edits.deletedStations = [];
+                    if (!edits.deletedStations.includes(stId)) {
+                        edits.deletedStations.push(stId);
+                    }
+                    edits.createdStations = (edits.createdStations || []).filter(s => s.id !== stId);
+                    if (edits.stations) {
+                        delete edits.stations[stId];
+                    }
+                    if (edits.lines) {
+                        for (const [code, lnEdit] of Object.entries(edits.lines)) {
+                            if (Array.isArray(lnEdit.stops)) {
+                                lnEdit.stops = lnEdit.stops.filter(s => s.station_id !== stId);
+                                lnEdit.stops.forEach((s, idx) => { s.sequence = idx; });
+                            }
+                        }
+                    }
                     this.saveStoredEdits(edits);
                 }
 
-                return { ok: true, server: false, removed: true };
+                return { ok: true, server: false, removed: true, deleted_id: stId };
             }
 
             // F) Actualizar trayecto de línea
@@ -886,6 +933,16 @@
                         await ApiClient.post(`/api/stations/${action.stationId}/update/`, { x: action.oldX, y: action.oldY });
                         st.x = action.oldX;
                         st.y = action.oldY;
+                    }
+                } else if (action.type === "station_delete") {
+                    const edits = ApiClient.getStoredEdits();
+                    if (Array.isArray(edits.deletedStations)) {
+                        edits.deletedStations = edits.deletedStations.filter(id => id !== action.stationId);
+                        ApiClient.saveStoredEdits(edits);
+                    }
+                    if (action.stationObj) {
+                        NetworkStore.stations.push(action.stationObj);
+                        NetworkStore.stationsById.set(action.stationId, action.stationObj);
                     }
                 } else if (action.type === "waypoints") {
                     await ApiClient.post(`/api/line-segments/${action.lsId}/waypoints/`, { waypoints: action.oldWaypoints });
@@ -1653,7 +1710,8 @@
 
             this.el.querySelector(".js-ctx-connect-segment")?.addEventListener("click", () => {
                 this.hide();
-                VisualEditorTools.openNewSegmentModal(st.id);
+                VisualEditorTools.setTool("connect_segment");
+                VisualEditorTools.handleStationClickForSegment(st.id);
             });
 
             this.el.querySelector(".js-ctx-add-corr")?.addEventListener("click", () => {
@@ -1726,7 +1784,8 @@
             });
             this.el.querySelector(".js-ctx-new-segment-here")?.addEventListener("click", () => {
                 this.hide();
-                VisualEditorTools.openNewSegmentModal(s1Id);
+                VisualEditorTools.setTool("connect_segment");
+                VisualEditorTools.handleStationClickForSegment(s1Id);
             });
         },
 
@@ -1774,7 +1833,7 @@
 
             this.el.querySelector(".js-ctx-connect-segment-empty")?.addEventListener("click", () => {
                 this.hide();
-                VisualEditorTools.openNewSegmentModal();
+                VisualEditorTools.setTool("connect_segment");
             });
 
             this.el.querySelector(".js-ctx-corr-empty")?.addEventListener("click", () => {
@@ -3228,8 +3287,13 @@
                 }
 
                 if (NetworkStore.editMode && stEl && e.button === 0) {
-                    e.stopPropagation();
                     const stId = Number(stEl.dataset.stationId);
+                    if (e.shiftKey && NetworkStore.selectedStationId && NetworkStore.selectedStationId !== stId) {
+                        e.stopPropagation();
+                        VisualEditorTools.connectStationsDirectly(NetworkStore.selectedStationId, stId);
+                        return;
+                    }
+                    e.stopPropagation();
                     const st = NetworkStore.stationsById.get(stId);
                     this.dragTarget = {
                         type: "station",
@@ -3960,9 +4024,11 @@
                 corrStationSel.value = String(stationId);
                 this.updateTargetLinesForStation(stationId);
             }
-            const edStationSel = document.getElementById("editStationSelect");
-            if (edStationSel && edStationSel.value !== String(stationId)) {
-                edStationSel.value = String(stationId);
+            const edStationId = document.getElementById("editStationId");
+            if (edStationId && edStationId.value !== String(stationId)) {
+                edStationId.value = String(stationId);
+                this.loadStationIntoEditor(stationId);
+            } else if (!edStationId) {
                 this.loadStationIntoEditor(stationId);
             }
 
@@ -4057,6 +4123,9 @@
                                     ⇄ Añadir a Línea (${servedCodes.length}/10)
                                 </button>
                             `}
+                            <button type="button" class="btn-secondary btn-xs js-connect-from-station" data-station-id="${st.id}" style="color:var(--accent-blue); font-weight:600;" title="Trazar y unir estaciones estilo MetroMapMaker">
+                                🔗 Trazar Línea
+                            </button>
                             <button type="button" class="btn-secondary btn-xs js-delete-station-btn" data-station-id="${st.id}" style="color:#ef4444; font-weight:600;">
                                 🗑 Eliminar
                             </button>
@@ -4304,7 +4373,6 @@
                 this.loadLineIntoEditor(NetworkStore.lines[0]?.code);
             }
 
-            const stSel = document.getElementById("editStationSelect");
             const addRouteStSel = document.getElementById("addRouteStationSelect");
             const stOptionsHtml = NetworkStore.getSortedStations()
                 .map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
@@ -4312,11 +4380,8 @@
             if (addRouteStSel) {
                 addRouteStSel.innerHTML = stOptionsHtml;
             }
-            if (stSel) {
-                stSel.innerHTML = stOptionsHtml;
-                if (NetworkStore.stations[0]) {
-                    this.loadStationIntoEditor(NetworkStore.stations[0].id);
-                }
+            if (NetworkStore.stations[0] && !document.getElementById("editStationId")?.value) {
+                this.loadStationIntoEditor(NetworkStore.stations[0].id);
             }
 
             if (lineSel && NetworkStore.lines[0]) {
@@ -4418,8 +4483,8 @@
         loadStationIntoEditor(stationId) {
             const st = NetworkStore.stationsById.get(Number(stationId));
             if (!st) return;
-            const sel = document.getElementById("editStationSelect");
-            if (sel) sel.value = String(st.id);
+            const idInput = document.getElementById("editStationId");
+            if (idInput) idInput.value = String(st.id);
             document.getElementById("editStationName").value = st.name;
             document.getElementById("editStationInfra").value = st.infrastructure_type;
             document.getElementById("editStationStatus").value = st.operational_status;
@@ -4500,23 +4565,25 @@
             const stId = Number(stationId);
             const st = NetworkStore.stationsById.get(stId);
             const name = stationName || (st ? st.name : `Estación ${stId}`);
-            if (!confirm(`¿Eliminar definitivamente la estación "${name}"?
-Se desvinculará de todas las líneas y tramos conectados.`)) {
-                return;
-            }
             try {
                 const res = await ApiClient.post(`/api/stations/${stId}/delete/`, {});
                 if (!res.ok) {
                     showToast(res.error || "No se pudo eliminar la estación");
                     return;
                 }
-                const msgMode = res.server ? "" : " (guardado localmente)";
-                showToast(`✓ Estación "${name}" eliminada${msgMode}`);
                 if (NetworkStore.selectedStationId === stId) {
                     NetworkStore.selectedStationId = null;
                     document.getElementById("stationInspectorContent")?.classList.add("hidden");
                     document.getElementById("inspectorEmptyState")?.classList.remove("hidden");
                 }
+                HistoryManager.push({
+                    type: "station_delete",
+                    stationId: stId,
+                    stationObj: st ? JSON.parse(JSON.stringify(st)) : null,
+                    description: `Eliminar estación "${name}"`
+                });
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`🗑️ Estación "${name}" eliminada${msgMode}`);
                 await refreshNetworkDataAndRender(true);
             } catch (err) {
                 console.error("Error al eliminar estación:", err);
@@ -4883,6 +4950,16 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                     return;
                 }
 
+                const connFromBtn = e.target.closest(".js-connect-from-station");
+                if (connFromBtn) {
+                    const stId = Number(connFromBtn.dataset.stationId);
+                    if (stId) {
+                        VisualEditorTools.setTool("connect_segment");
+                        VisualEditorTools.handleStationClickForSegment(stId);
+                    }
+                    return;
+                }
+
                 const deleteStBtn = e.target.closest(".js-delete-station-btn");
                 if (deleteStBtn) {
                     const stId = Number(deleteStBtn.dataset.stationId);
@@ -4924,7 +5001,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         inspTagBtn.classList.toggle("active", idx < 0);
                         inspTagBtn.setAttribute("aria-pressed", String(idx < 0));
                         SchematicMapEngine.renderTracksAndStations();
-                        if (Number(document.getElementById("editStationSelect")?.value) === st.id) {
+                        if (Number(document.getElementById("editStationId")?.value) === st.id || NetworkStore.selectedStationId === st.id) {
                             this.loadStationIntoEditor(st.id);
                         }
                         await ApiClient.post(`/api/stations/${st.id}/update/`, { icon_tags: st.icon_tags });
@@ -4960,7 +5037,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         SchematicMapEngine.renderTracksAndStations();
                         if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                         this.selectStation(st.id);
-                        if (Number(document.getElementById("editStationSelect")?.value) === st.id) {
+                        if (Number(document.getElementById("editStationId")?.value) === st.id || NetworkStore.selectedStationId === st.id) {
                             this.loadStationIntoEditor(st.id);
                         }
                         if (document.getElementById("editLineSelect")?.value === code) {
@@ -4988,7 +5065,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         SchematicMapEngine.renderTracksAndStations();
                         if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                         this.selectStation(st.id);
-                        if (Number(document.getElementById("editStationSelect")?.value) === st.id) {
+                        if (Number(document.getElementById("editStationId")?.value) === st.id || NetworkStore.selectedStationId === st.id) {
                             this.loadStationIntoEditor(st.id);
                         }
                         if (document.getElementById("editLineSelect")?.value === code) {
@@ -5087,9 +5164,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
             document.getElementById("editLineColorPicker")?.addEventListener("input", (e) => {
                 document.getElementById("editLineColor").value = e.target.value;
             });
-            document.getElementById("editStationSelect")?.addEventListener("change", (e) => {
-                this.loadStationIntoEditor(e.target.value);
-            });
+
             document.getElementById("editCitySelect")?.addEventListener("change", (e) => {
                 this.loadCityIntoEditor(e.target.value);
             });
@@ -5288,7 +5363,11 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
             // Guardar edición de Estación
             document.getElementById("formEditStation")?.addEventListener("submit", async (e) => {
                 e.preventDefault();
-                const stId = document.getElementById("editStationSelect").value;
+                const stId = Number(document.getElementById("editStationId")?.value || NetworkStore.selectedStationId);
+                if (!stId) {
+                    showToast("Selecciona una estación en el mapa para editar sus datos");
+                    return;
+                }
                 const selectedTags = Array.from(
                     document.querySelectorAll("#editStationTagsGroup .tag-chip-btn.active")
                 ).map(btn => btn.dataset.tagId).filter(Boolean);

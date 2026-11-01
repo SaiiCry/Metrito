@@ -101,7 +101,6 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
     });
 
     it("configuración de endpoint de Vercel (setApiBase / getApiBase) y enrutamiento remoto", () => {
-        // Simular ApiClient.setApiBase y getApiBase
         const setApiBase = (url) => {
             if (!url || !url.trim()) {
                 mockLocalStorage.removeItem("metrito_api_url");
@@ -115,19 +114,15 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
             return stored ? stored.trim().replace(/\/+$/, "") : "";
         };
 
-        // Estado inicial vacío
         assert.equal(getApiBase(), "");
 
-        // Asignar backend en Vercel
         setApiBase("https://metrito-api.vercel.app/");
         assert.equal(getApiBase(), "https://metrito-api.vercel.app");
 
-        // Construir endpoint con prefijo remoto de Vercel
         const endpoint = "/api/network/";
         const fullUrl = `${getApiBase()}${endpoint}`;
         assert.equal(fullUrl, "https://metrito-api.vercel.app/api/network/");
 
-        // Limpiar para volver a modo autónomo en GitHub Pages
         setApiBase("");
         assert.equal(getApiBase(), "");
     });
@@ -137,7 +132,6 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         const st2 = mockStore.stationsById.get(102); // Línea ["1"]
         const lineCode = "2";
 
-        // Conectar st1 y st2 en Línea 2 directamente
         if (!st2.lines.includes(lineCode)) st2.lines.push(lineCode);
         st2.is_transfer = st2.lines.length > 1;
 
@@ -152,5 +146,60 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         assert.equal(st2.lines.includes("2"), true);
         assert.equal(st2.is_transfer, true);
         assert.equal(ln2.stops.length, 2);
+    });
+
+    it("eliminación de estación en modo offline persiste en deletedStations y no resucita al recargar topología base", () => {
+        const stIdToDelete = 102;
+        
+        // 1. Simular eliminación local
+        mockStore.stations = mockStore.stations.filter(s => s.id !== stIdToDelete);
+        mockStore.stationsById.delete(stIdToDelete);
+        for (const ln of mockStore.lines) {
+            ln.stops = ln.stops.filter(s => s.station_id !== stIdToDelete);
+        }
+
+        const edits = {
+            stations: {},
+            lines: {},
+            createdStations: [],
+            createdLines: [],
+            cityOutlines: {},
+            deletedStations: [stIdToDelete]
+        };
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify(edits));
+
+        assert.equal(mockStore.stationsById.has(102), false);
+        assert.equal(mockStore.stations.length, 1);
+        assert.equal(mockStore.lines[0].stops.length, 1);
+
+        // 2. Simular recarga de topología base (data/network.json con las estaciones originales)
+        const baseStations = [
+            { id: 101, code: "st-101", name: "Estación Central", lines: ["1", "2"], is_transfer: true },
+            { id: 102, code: "st-102", name: "Estación Norte", lines: ["1"], is_transfer: false }
+        ];
+        mockStore.stations = [...baseStations];
+        mockStore.stationsById.clear();
+        mockStore.stations.forEach(s => mockStore.stationsById.set(s.id, s));
+        mockStore.lines[0].stops = [
+            { station_id: 101, sequence: 0, waypoints: [] },
+            { station_id: 102, sequence: 1, waypoints: [] }
+        ];
+
+        // 3. Re-aplicar capas de localStorage (applyStoredEditsToStore)
+        const storedEdits = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        if (Array.isArray(storedEdits.deletedStations) && storedEdits.deletedStations.length > 0) {
+            const delSet = new Set(storedEdits.deletedStations.map(Number));
+            mockStore.stations = mockStore.stations.filter(s => !delSet.has(s.id));
+            for (const delId of delSet) mockStore.stationsById.delete(delId);
+            for (const ln of mockStore.lines) {
+                ln.stops = ln.stops.filter(s => !delSet.has(s.station_id));
+            }
+        }
+
+        // 4. Verificar que la estación eliminada no revivió
+        assert.equal(mockStore.stationsById.has(102), false);
+        assert.equal(mockStore.stations.length, 1);
+        assert.equal(mockStore.stations[0].id, 101);
+        assert.equal(mockStore.lines[0].stops.length, 1);
     });
 });

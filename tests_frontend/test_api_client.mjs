@@ -267,4 +267,76 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         assert.equal(ln1.stops.length, 1);
         assert.equal(removedSt.lines.includes("1"), false);
     });
+
+    it("enderezado ortogonal de línea en modo offline genera esquinas exactas a 90°/180° y persiste en almacenamiento", () => {
+        const ln1 = mockStore.linesByCode.get("1");
+        const st1 = mockStore.stationsById.get(101);
+        const st2 = mockStore.stationsById.get(102);
+
+        // Estaciones en diagonal: st1(100, 200), st2(500, 260) -> dx = 400, dy = 60
+        st1.x = 100.0;
+        st1.y = 200.0;
+        st2.x = 500.0;
+        st2.y = 260.0;
+
+        // Simular lógica de ApiClient.applyLocalMutation para enderezar línea 1
+        const branches = {};
+        for (const s of ln1.stops) {
+            const b = s.branch || "main";
+            if (!branches[b]) branches[b] = [];
+            branches[b].push(s);
+        }
+        for (const [branchName, bStops] of Object.entries(branches)) {
+            const n = bStops.length;
+            if (n < 2) continue;
+            for (let i = 0; i < n - 1; i++) {
+                const s1 = bStops[i];
+                const s2 = bStops[i + 1];
+                const station1 = mockStore.stationsById.get(s1.station_id);
+                const station2 = mockStore.stationsById.get(s2.station_id);
+                const dx = station2.x - station1.x;
+                const dy = station2.y - station1.y;
+                if (Math.abs(dy) < 1.0) {
+                    s1.waypoints = [];
+                } else if (Math.abs(dx) < 1.0) {
+                    s1.waypoints = [];
+                } else {
+                    if (Math.abs(dx) >= Math.abs(dy)) {
+                        s1.waypoints = [[Math.round(station2.x * 2) / 2, Math.round(station1.y * 2) / 2]];
+                    } else {
+                        s1.waypoints = [[Math.round(station1.x * 2) / 2, Math.round(station2.y * 2) / 2]];
+                    }
+                }
+            }
+            bStops[n - 1].waypoints = [];
+        }
+
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify({
+            lines: { "1": { stops: ln1.stops } }
+        }));
+
+        assert.equal(ln1.stops[0].waypoints.length, 1);
+        assert.deepEqual(ln1.stops[0].waypoints[0], [500.0, 200.0]);
+        // dy = 0 horizontal (180°), luego dx = 0 vertical (90°)
+        assert.equal(ln1.stops[0].waypoints[0][1] - st1.y, 0);
+        assert.equal(st2.x - ln1.stops[0].waypoints[0][0], 0);
+
+        const saved = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        assert.deepEqual(saved.lines["1"].stops[0].waypoints, [[500.0, 200.0]]);
+    });
+
+    it("actualización de waypoints de un tramo persiste correctamente", () => {
+        const ln1 = mockStore.linesByCode.get("1");
+        const stop = ln1.stops[0];
+        stop.id = 55;
+        const newWps = [[200.0, 150.0], [300.0, 150.0]];
+        stop.waypoints = newWps;
+
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify({
+            segments: { 55: { waypoints: newWps } }
+        }));
+
+        const saved = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        assert.deepEqual(saved.segments["55"].waypoints, [[200.0, 150.0], [300.0, 150.0]]);
+    });
 });

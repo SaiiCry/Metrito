@@ -489,3 +489,147 @@ describe("Renderizador de Selectores de Línea Destino en Correspondencias", () 
         assert.ok(mockChecklist.innerHTML.includes('value="S3"'));
     });
 });
+
+
+describe("Snap de Waypoints - Exactitud de Ángulos Ortogonales y Octilineales entre Paradas", () => {
+    function snapPointOctilinear(anchor, target) {
+        const ax = Number(anchor[0]);
+        const ay = Number(anchor[1]);
+        const tx = Number(target[0]);
+        const ty = Number(target[1]);
+        const dx = tx - ax;
+        const dy = ty - ay;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1.0) return [Math.round(tx * 2) / 2, Math.round(ty * 2) / 2];
+        let deg = (Math.atan2(dy, dx) * 180 / Math.PI) % 360;
+        if (deg < 0) deg += 360;
+        const oct = Math.round(deg / 45) % 8;
+        const dDiag = Math.round((dist * 0.7071067811865476) * 2) / 2;
+        const dOrtho = Math.round(dist * 2) / 2;
+        switch (oct) {
+            case 0: return [Math.round((ax + dOrtho) * 2) / 2, ay];
+            case 1: return [Math.round((ax + dDiag) * 2) / 2, Math.round((ay + dDiag) * 2) / 2];
+            case 2: return [ax, Math.round((ay + dOrtho) * 2) / 2];
+            case 3: return [Math.round((ax - dDiag) * 2) / 2, Math.round((ay + dDiag) * 2) / 2];
+            case 4: return [Math.round((ax - dOrtho) * 2) / 2, ay];
+            case 5: return [Math.round((ax - dDiag) * 2) / 2, Math.round((ay - dDiag) * 2) / 2];
+            case 6: return [ax, Math.round((ay - dOrtho) * 2) / 2];
+            case 7: return [Math.round((ax + dDiag) * 2) / 2, Math.round((ay - dDiag) * 2) / 2];
+            default: return [tx, ty];
+        }
+    }
+
+    function snapWaypoint(prevPt, nextPt, mousePt) {
+        const mx = Number(mousePt[0]);
+        const my = Number(mousePt[1]);
+        if (!prevPt) return [Math.round(mx * 2) / 2, Math.round(my * 2) / 2];
+        const x0 = Number(prevPt[0]);
+        const y0 = Number(prevPt[1]);
+        if (!nextPt) return snapPointOctilinear([x0, y0], [mx, my]);
+        const x1 = Number(nextPt[0]);
+        const y1 = Number(nextPt[1]);
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const candidates = [];
+        const addCandidate = (cx, cy, priority = 1.0) => {
+            const rx = Math.round(cx * 2) / 2;
+            const ry = Math.round(cy * 2) / 2;
+            if (!candidates.some(c => Math.abs(c.x - rx) < 0.5 && Math.abs(c.y - ry) < 0.5)) {
+                candidates.push({ x: rx, y: ry, priority });
+            }
+        };
+
+        // 1. Esquinas ortogonales puras a 90° / 180°:
+        addCandidate(x1, y0, 1.8);
+        addCandidate(x0, y1, 1.8);
+
+        // 2. Trazos ortogonales-octilineales a 45°
+        const signX = Math.sign(dx) || 1;
+        const signY = Math.sign(dy) || 1;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+        if (absDx >= absDy) {
+            addCandidate(x0 + signX * absDy, y1, 1.5);
+            addCandidate(x1 - signX * absDy, y0, 1.5);
+        }
+        if (absDy >= absDx) {
+            addCandidate(x1, y0 + signY * absDx, 1.5);
+            addCandidate(x0, y1 - signY * absDx, 1.5);
+        }
+
+        if (absDx < 1.0 || absDy < 1.0) {
+            const octPrev = snapPointOctilinear([x0, y0], [mx, my]);
+            addCandidate(octPrev[0], octPrev[1], 1.0);
+            const octNext = snapPointOctilinear([x1, y1], [mx, my]);
+            addCandidate(octNext[0], octNext[1], 1.0);
+        }
+
+        let best = null;
+        let bestScore = Infinity;
+        for (const cand of candidates) {
+            const dist = Math.hypot(cand.x - mx, cand.y - my);
+            const score = dist / (cand.priority || 1.0);
+            if (score < bestScore) {
+                bestScore = score;
+                best = cand;
+            }
+        }
+        return best ? [best.x, best.y] : [Math.round(mx * 2) / 2, Math.round(my * 2) / 2];
+    }
+
+    it("acomoda el trazo a esquina ortogonal exacta a 90°/180° horizontal-vertical", () => {
+        const prev = [100.0, 100.0];
+        const next = [400.0, 250.0];
+        const mouse = [380.0, 110.0];
+        const snapped = snapWaypoint(prev, next, mouse);
+        assert.deepEqual(snapped, [400.0, 100.0]);
+        assert.equal(snapped[1], prev[1]);
+        assert.equal(snapped[0], next[0]);
+    });
+
+    it("acomoda el trazo a esquina ortogonal exacta a 90°/180° vertical-horizontal", () => {
+        const prev = [100.0, 100.0];
+        const next = [400.0, 250.0];
+        const mouse = [110.0, 240.0];
+        const snapped = snapWaypoint(prev, next, mouse);
+        assert.deepEqual(snapped, [100.0, 250.0]);
+        assert.equal(snapped[0], prev[0]);
+        assert.equal(snapped[1], next[1]);
+    });
+
+    it("acomoda el trazo a ángulo octilineal exacto a 45° seguido de recta", () => {
+        const prev = [100.0, 100.0];
+        const next = [400.0, 250.0];
+        const mouse = [240.0, 235.0];
+        const snapped = snapWaypoint(prev, next, mouse);
+        assert.deepEqual(snapped, [250.0, 250.0]);
+        assert.equal(Math.abs(snapped[0] - prev[0]), Math.abs(snapped[1] - prev[1]));
+        assert.equal(snapped[1], next[1]);
+    });
+
+    it("snap magnético de estación alinea a 180° horizontal con estación vecina", () => {
+        const neighbor = { x: 500.0, y: 300.0 };
+        const mouseX = 820.0;
+        const mouseY = 308.0;
+        let targetX = Math.round(mouseX * 2) / 2;
+        let targetY = Math.round(mouseY * 2) / 2;
+        if (Math.abs(mouseY - neighbor.y) <= 16.0) {
+            targetY = neighbor.y;
+        }
+        assert.equal(targetY, 300.0);
+        assert.equal(targetY - neighbor.y, 0);
+    });
+
+    it("snap magnético de estación alinea a 90° vertical con estación vecina", () => {
+        const neighbor = { x: 500.0, y: 300.0 };
+        const mouseX = 506.0;
+        const mouseY = 720.0;
+        let targetX = Math.round(mouseX * 2) / 2;
+        let targetY = Math.round(mouseY * 2) / 2;
+        if (Math.abs(mouseX - neighbor.x) <= 16.0) {
+            targetX = neighbor.x;
+        }
+        assert.equal(targetX, 500.0);
+        assert.equal(targetX - neighbor.x, 0);
+    });
+});

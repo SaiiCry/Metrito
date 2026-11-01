@@ -750,8 +750,44 @@
                 const lineCode = match ? decodeURIComponent(match[1]) : payload?.line_code;
                 const ln = NetworkStore.linesByCode.get(lineCode);
                 if (ln) {
-                    if (payload?.clear_all_waypoints && Array.isArray(ln.stops)) {
-                        ln.stops.forEach(s => { s.waypoints = []; });
+                    if ((payload?.clear_all_waypoints || payload?.straighten_tracks) && Array.isArray(ln.stops)) {
+                        const isOrthogonal = payload.straighten_orthogonal !== false;
+                        const branches = {};
+                        for (const s of ln.stops) {
+                            const b = s.branch || "main";
+                            if (!branches[b]) branches[b] = [];
+                            branches[b].push(s);
+                        }
+                        for (const [branchName, bStops] of Object.entries(branches)) {
+                            const n = bStops.length;
+                            if (n < 2) continue;
+                            const limit = (ln.is_circular && branchName === "main") ? n : (n - 1);
+                            for (let i = 0; i < limit; i++) {
+                                const s1 = bStops[i];
+                                const s2 = bStops[(i + 1) % n];
+                                const st1 = NetworkStore.stationsById.get(s1.station_id);
+                                const st2 = NetworkStore.stationsById.get(s2.station_id);
+                                if (!st1 || !st2) continue;
+                                const dx = st2.x - st1.x;
+                                const dy = st2.y - st1.y;
+                                if (Math.abs(dy) < 1.0) {
+                                    s1.waypoints = [];
+                                } else if (Math.abs(dx) < 1.0) {
+                                    s1.waypoints = [];
+                                } else if (!isOrthogonal && Math.abs(Math.abs(dx) - Math.abs(dy)) < 1.0) {
+                                    s1.waypoints = [];
+                                } else {
+                                    if (Math.abs(dx) >= Math.abs(dy)) {
+                                        s1.waypoints = [[Math.round(st2.x * 2) / 2, Math.round(st1.y * 2) / 2]];
+                                    } else {
+                                        s1.waypoints = [[Math.round(st1.x * 2) / 2, Math.round(st2.y * 2) / 2]];
+                                    }
+                                }
+                            }
+                            if (!(ln.is_circular && branchName === "main") && n > 0) {
+                                bStops[n - 1].waypoints = [];
+                            }
+                        }
                     }
                     if (payload?.stops) {
                         ln.stops = payload.stops;
@@ -3138,21 +3174,93 @@
             }
         },
 
+        snapWaypoint(prevPt, nextPt, mousePt) {
+            const mx = Number(mousePt[0] !== undefined ? mousePt[0] : mousePt.x);
+            const my = Number(mousePt[1] !== undefined ? mousePt[1] : mousePt.y);
+            if (!prevPt) return [Math.round(mx * 2) / 2, Math.round(my * 2) / 2];
+
+            const x0 = Number(prevPt[0] !== undefined ? prevPt[0] : prevPt.x);
+            const y0 = Number(prevPt[1] !== undefined ? prevPt[1] : prevPt.y);
+
+            if (!nextPt) {
+                return this.snapPointOctilinear([x0, y0], [mx, my]);
+            }
+
+            const x1 = Number(nextPt[0] !== undefined ? nextPt[0] : nextPt.x);
+            const y1 = Number(nextPt[1] !== undefined ? nextPt[1] : nextPt.y);
+
+            const dx = x1 - x0;
+            const dy = y1 - y0;
+
+            const candidates = [];
+            const addCandidate = (cx, cy, priority = 1.0) => {
+                const rx = Math.round(cx * 2) / 2;
+                const ry = Math.round(cy * 2) / 2;
+                if (!candidates.some(c => Math.abs(c.x - rx) < 0.5 && Math.abs(c.y - ry) < 0.5)) {
+                    candidates.push({ x: rx, y: ry, priority });
+                }
+            };
+
+            // 1. Esquinas ortogonales puras a 90° / 180° (Dual-transit exacto):
+            // Opción A: Horizontal saliendo de prev (y = y0), luego vertical hacia next (x = x1)
+            addCandidate(x1, y0, 1.8);
+            // Opción B: Vertical saliendo de prev (x = x0), luego horizontal hacia next (y = y1)
+            addCandidate(x0, y1, 1.8);
+
+            // 2. Trazos ortogonales-octilineales a 45° combinados con 90°/180° (Dual-transit exacto):
+            const signX = Math.sign(dx) || 1;
+            const signY = Math.sign(dy) || 1;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            if (absDx >= absDy) {
+                // Diagonal 45° saliendo de prev, luego horizontal a next:
+                addCandidate(x0 + signX * absDy, y1, 1.5);
+                // Horizontal saliendo de prev, luego diagonal 45° a next:
+                addCandidate(x1 - signX * absDy, y0, 1.5);
+            }
+            if (absDy >= absDx) {
+                // Diagonal 45° saliendo de prev, luego vertical a next:
+                addCandidate(x1, y0 + signY * absDx, 1.5);
+                // Vertical saliendo de prev, luego diagonal 45° a next:
+                addCandidate(x0, y1 - signY * absDx, 1.5);
+            }
+
+            // 3. Si las estaciones ya están alineadas en el mismo eje (dx < 1 o dy < 1):
+            if (absDx < 1.0 || absDy < 1.0) {
+                const octPrev = this.snapPointOctilinear([x0, y0], [mx, my]);
+                addCandidate(octPrev[0], octPrev[1], 1.0);
+                const octNext = this.snapPointOctilinear([x1, y1], [mx, my]);
+                addCandidate(octNext[0], octNext[1], 1.0);
+            }
+
+            let best = null;
+            let bestScore = Infinity;
+            for (const cand of candidates) {
+                const dist = Math.hypot(cand.x - mx, cand.y - my);
+                const score = dist / (cand.priority || 1.0);
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = cand;
+                }
+            }
+
+            return best ? [best.x, best.y] : [Math.round(mx * 2) / 2, Math.round(my * 2) / 2];
+        },
+
         async persistSegmentWaypoints(stopObj, lineCode) {
             if (!stopObj || !stopObj.id) return;
             try {
                 const res = await ApiClient.post(`/api/line-segments/${stopObj.id}/waypoints/`, {
-                    waypoints: stopObj.waypoints || [],
-                    snap: true
+                    waypoints: stopObj.waypoints || []
                 });
-                const resp = res;
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (data && Array.isArray(data.waypoints)) {
-                        stopObj.waypoints = data.waypoints;
-                        this.renderTracksAndStations();
-                        this.renderEditHandles();
+                if (res && res.ok) {
+                    const wps = res.data?.waypoints || res.waypoints;
+                    if (Array.isArray(wps)) {
+                        stopObj.waypoints = wps;
                     }
+                    this.renderTracksAndStations();
+                    this.renderEditHandles();
                 }
             } catch (err) {
                 console.error("Error al persistir waypoints:", err);
@@ -3399,12 +3507,24 @@
                     const stopObj = this.findStopByLsId(lineCode, lsId);
                     if (stopObj) {
                         const oldWaypoints = JSON.parse(JSON.stringify(stopObj.waypoints || []));
+                        let s2Id = null;
+                        const ln = NetworkStore.linesByCode.get(lineCode);
+                        if (ln && Array.isArray(ln.stops)) {
+                            const sIdx = ln.stops.findIndex(s => s.id === lsId);
+                            if (sIdx >= 0 && sIdx < ln.stops.length - 1) {
+                                s2Id = ln.stops[sIdx + 1].station_id;
+                            } else if (sIdx >= 0 && ln.is_circular) {
+                                s2Id = ln.stops[0].station_id;
+                            }
+                        }
                         this.dragTarget = {
                             type: "waypoint",
                             lineCode,
                             lsId,
                             stopObj,
                             wpIdx,
+                            s1Id: stopObj.station_id,
+                            s2Id,
                             oldWaypoints,
                             moved: false
                         };
@@ -3461,7 +3581,8 @@
                         const pts = [[st1.x, st1.y], ...stopObj.waypoints, [st2.x, st2.y]];
                         const insertIdx = this.findClosestSegmentInsertIndex(pts, svgPt.x, svgPt.y);
                         const anchor = pts[insertIdx];
-                        const snappedPt = this.snapPointOctilinear(anchor, [svgPt.x, svgPt.y]);
+                        const nextAnchor = pts[insertIdx + 1] || [st2.x, st2.y];
+                        const snappedPt = this.snapWaypoint(anchor, nextAnchor, [svgPt.x, svgPt.y]);
                         stopObj.waypoints.splice(insertIdx, 0, snappedPt);
                         this.renderTracksAndStations();
                         this.renderEditHandles();
@@ -3472,6 +3593,7 @@
                             stopObj,
                             wpIdx: insertIdx,
                             s1Id,
+                            s2Id,
                             oldWaypoints,
                             moved: true
                         };
@@ -3533,20 +3655,86 @@
                     if (this.dragTarget.type === "station") {
                         const st = NetworkStore.stationsById.get(this.dragTarget.id);
                         if (st) {
-                            st.x = Math.round(svgPt.x * 2) / 2;
-                            st.y = Math.round(svgPt.y * 2) / 2;
+                            let targetX = Math.round(svgPt.x * 2) / 2;
+                            let targetY = Math.round(svgPt.y * 2) / 2;
+
+                            // Snap magnético inteligente respecto a estaciones vecinas en líneas conectadas
+                            const connectedStations = [];
+                            for (const ln of NetworkStore.lines) {
+                                if (!Array.isArray(ln.stops)) continue;
+                                for (let i = 0; i < ln.stops.length; i++) {
+                                    if (ln.stops[i].station_id === st.id) {
+                                        if (i > 0) {
+                                            const prevSt = NetworkStore.stationsById.get(ln.stops[i - 1].station_id);
+                                            if (prevSt && !connectedStations.some(cs => cs.id === prevSt.id)) connectedStations.push(prevSt);
+                                        }
+                                        if (i < ln.stops.length - 1) {
+                                            const nextSt = NetworkStore.stationsById.get(ln.stops[i + 1].station_id);
+                                            if (nextSt && !connectedStations.some(cs => cs.id === nextSt.id)) connectedStations.push(nextSt);
+                                        }
+                                    }
+                                }
+                            }
+
+                            const SNAP_THRESH = 16.0;
+                            let snappedHoriz = false;
+                            let snappedVert = false;
+
+                            for (const nb of connectedStations) {
+                                if (!snappedHoriz && Math.abs(svgPt.y - nb.y) <= SNAP_THRESH) {
+                                    targetY = nb.y;
+                                    snappedHoriz = true;
+                                }
+                                if (!snappedVert && Math.abs(svgPt.x - nb.x) <= SNAP_THRESH) {
+                                    targetX = nb.x;
+                                    snappedVert = true;
+                                }
+                            }
+
+                            // Si no se alineó horizontal/verticalmente, checar snap diagonal a 45° con vecinos
+                            if (!snappedHoriz && !snappedVert) {
+                                for (const nb of connectedStations) {
+                                    const cdx = svgPt.x - nb.x;
+                                    const cdy = svgPt.y - nb.y;
+                                    if (Math.abs(Math.abs(cdx) - Math.abs(cdy)) <= SNAP_THRESH) {
+                                        const diagDist = (Math.abs(cdx) + Math.abs(cdy)) / 2;
+                                        targetX = Math.round((nb.x + Math.sign(cdx || 1) * diagDist) * 2) / 2;
+                                        targetY = Math.round((nb.y + Math.sign(cdy || 1) * diagDist) * 2) / 2;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            st.x = targetX;
+                            st.y = targetY;
                             st.lat = Number(lat);
                             st.lng = Number(lng);
                             this.dragTarget.moved = true;
                             this.scheduleDragRender();
                         }
                     } else if (this.dragTarget.type === "waypoint") {
-                        const { stopObj, wpIdx } = this.dragTarget;
+                        const { stopObj, wpIdx, s1Id, s2Id, lineCode } = this.dragTarget;
                         if (stopObj && Array.isArray(stopObj.waypoints) && stopObj.waypoints[wpIdx]) {
-                            const st1 = NetworkStore.stationsById.get(stopObj.station_id) || stopObj;
-                            const anchor = wpIdx > 0 ? stopObj.waypoints[wpIdx - 1] : [st1.x, st1.y];
-                            // El snap octilineal a múltiplos exactos de 45° es 100% automático en cada arrastre
-                            const nextPt = this.snapPointOctilinear(anchor, [svgPt.x, svgPt.y]);
+                            const st1 = NetworkStore.stationsById.get(stopObj.station_id || s1Id) || stopObj;
+                            let st2 = null;
+                            if (s2Id) {
+                                st2 = NetworkStore.stationsById.get(s2Id);
+                            }
+                            if (!st2 && lineCode) {
+                                const ln = NetworkStore.linesByCode.get(lineCode);
+                                if (ln && Array.isArray(ln.stops)) {
+                                    const sIdx = ln.stops.findIndex(s => s.id === stopObj.id);
+                                    if (sIdx >= 0 && sIdx < ln.stops.length - 1) {
+                                        st2 = NetworkStore.stationsById.get(ln.stops[sIdx + 1].station_id);
+                                    } else if (sIdx >= 0 && ln.is_circular) {
+                                        st2 = NetworkStore.stationsById.get(ln.stops[0].station_id);
+                                    }
+                                }
+                            }
+                            const prevAnchor = wpIdx > 0 ? stopObj.waypoints[wpIdx - 1] : (st1 ? [st1.x, st1.y] : null);
+                            const nextAnchor = wpIdx < stopObj.waypoints.length - 1 ? stopObj.waypoints[wpIdx + 1] : (st2 ? [st2.x, st2.y] : null);
+
+                            const nextPt = this.snapWaypoint(prevAnchor, nextAnchor, [svgPt.x, svgPt.y]);
                             stopObj.waypoints[wpIdx] = nextPt;
                             this.dragTarget.moved = true;
                             this.scheduleDragRender();
@@ -5435,8 +5623,18 @@
                             } else {
                                 s1.waypoints = Math.abs(dx) < 0.5 ? [] : [[Math.round(st1.x * 2) / 2, Math.round(st2.y * 2) / 2]];
                             }
+                            const lineCode = document.getElementById("editLineSelect")?.value;
+                            const ln = NetworkStore.linesByCode.get(lineCode);
+                            if (ln) {
+                                ln.stops = [...stops];
+                                ln.is_custom_modified = true;
+                            }
+                            if (s1.id) {
+                                await ApiClient.post(`/api/line-segments/${s1.id}/waypoints/`, { waypoints: s1.waypoints });
+                            }
                             this.renderLineRouteEditor();
                             SchematicMapEngine.renderTracksAndStations();
+                            if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                             showToast(`✓ Tramo hacia ${st2.name} enderezado derecho a ${Math.abs(dx) >= Math.abs(dy) ? "180° (horizontal)" : "90° (vertical)"}`);
                         }
                     }

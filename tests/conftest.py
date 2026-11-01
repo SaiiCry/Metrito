@@ -775,3 +775,292 @@ def transfer_network(editor_network_factory):
         "line_brt": bundle["line_brt"],
         "bundle": bundle,
     }
+
+
+@pytest.fixture
+def large_network_factory(db, line_factory, brt_line_factory, station_factory):
+    """
+    Fábrica parametrizable de alto rendimiento para generar redes de metro y de
+    autobuses articulados de gran escala (cientos de estaciones y LineStation ordenados).
+
+    Parámetros de entrada:
+    - metro_lines (int): Número de líneas de metro (>= 1, rango típico: 1 a 35).
+    - brt_lines (int): Número de líneas de autobús articulado BRT (>= 0, rango típico: 0 a 20).
+    - stations_per_line (int): Número de estaciones en la ruta principal de cada línea (>= 2, rango: 5 a 60).
+    - branches_per_line (int): Número de ramas por línea (>= 1; 1 = solo 'main', 2 = 'main' + 'ramal_1').
+    - transfer_ratio (float): Proporción de estaciones de correspondencia interlínea (0.0 a 0.8).
+    - prefix (str): Prefijo único para códigos y nombres de estaciones y líneas.
+
+    Valida todos los parámetros lanzando ValueError descriptivos ante entradas inválidas.
+    Construye cientos de registros en fracciones de segundo (< 0.5s) respetando
+    unique_together = [('line', 'branch', 'sequence')] y la integridad de models.py.
+    """
+    large_counter = 0
+
+    def _build_large_network(
+        metro_lines: int = 6,
+        brt_lines: int = 4,
+        stations_per_line: int = 20,
+        branches_per_line: int = 1,
+        transfer_ratio: float = 0.20,
+        prefix: str = "lg",
+        **kwargs
+    ) -> NetworkEntityBundle:
+        nonlocal large_counter
+        large_counter += 1
+        run_id = large_counter
+
+        # 1. Validación estricta de parámetros
+        if not isinstance(metro_lines, int) or metro_lines < 1:
+            raise ValueError(f"metro_lines debe ser un entero >= 1, recibido: {metro_lines}")
+        if not isinstance(brt_lines, int) or brt_lines < 0:
+            raise ValueError(f"brt_lines debe ser un entero >= 0, recibido: {brt_lines}")
+        if metro_lines + brt_lines < 2:
+            raise ValueError(f"Se requieren al menos 2 líneas en total (metro_lines + brt_lines >= 2), recibido: {metro_lines + brt_lines}")
+        if not isinstance(stations_per_line, int) or stations_per_line < 2:
+            raise ValueError(f"stations_per_line debe ser un entero >= 2, recibido: {stations_per_line}")
+        if not isinstance(branches_per_line, int) or branches_per_line < 1:
+            raise ValueError(f"branches_per_line debe ser un entero >= 1, recibido: {branches_per_line}")
+        if not isinstance(transfer_ratio, (int, float)) or not (0.0 <= transfer_ratio <= 0.8):
+            raise ValueError(f"transfer_ratio debe ser un float entre 0.0 y 0.8, recibido: {transfer_ratio}")
+
+        total_lines_count = metro_lines + brt_lines
+
+        # 2. Crear líneas usando line_factory y brt_line_factory
+        created_lines = []
+        for i in range(metro_lines):
+            c_code = f"{prefix}M{run_id}_{i+1}"
+            l = line_factory(
+                code=c_code,
+                name=f"Línea {i+1} Metro ({prefix})",
+                route_title=f"Terminal M{i+1}A · Terminal M{i+1}B",
+                network_type="metro",
+                line_subtype="convencional",
+                color=f"#{((i * 47 + 23) % 256):02x}{((i * 83 + 51) % 256):02x}{((i * 131 + 107) % 256):02x}",
+                length_km=round(10.0 + (i * 2.5), 1),
+                frequency_seconds=150 + (i * 10),
+            )
+            created_lines.append(l)
+
+        for j in range(brt_lines):
+            b_code = f"{prefix}S{run_id}_{j+1}"
+            b = brt_line_factory(
+                code=b_code,
+                name=f"Sistema BRT {j+1} ({prefix})",
+                route_title=f"Terminal BRT {j+1}A · Terminal BRT {j+1}B",
+                network_type="bus_articulado",
+                line_subtype="bus_articulado",
+                color=f"#{((j * 61 + 71) % 256):02x}B{((j * 97 + 13) % 256):02x}",
+                length_km=round(8.0 + (j * 2.0), 1),
+                frequency_seconds=200 + (j * 15),
+            )
+            created_lines.append(b)
+
+        # 3. Planificar estaciones de correspondencia garantizando presencia en todas sus líneas asignadas
+        # Capacidad de slots intermedios por línea: stations_per_line - 2 (sin terminales inicio/fin)
+        max_transfers_per_line = max(1, (stations_per_line - 2) // 3)
+        num_transfers = max(2, min(total_lines_count * max_transfers_per_line // 2, int(round((total_lines_count * stations_per_line) * transfer_ratio / 2.0))))
+
+        transfer_stations = []
+        # Mapa: line_id -> dict { slot_seq: station_obj }
+        line_transfer_slots = {l.id: {} for l in created_lines}
+
+        for t_idx in range(num_transfers):
+            # Asignar a 2 o 3 líneas
+            l1 = created_lines[t_idx % total_lines_count]
+            l2 = created_lines[(t_idx + 1) % total_lines_count]
+            assigned_lines_sample = [l1, l2]
+            if t_idx % 3 == 0 and total_lines_count >= 3:
+                l3 = created_lines[(t_idx + 2) % total_lines_count]
+                assigned_lines_sample.append(l3)
+
+            t_codes = [ln.code for ln in assigned_lines_sample]
+            t_tags = [ALLOWED_ICON_TAGS[t_idx % len(ALLOWED_ICON_TAGS)]]
+            if t_idx % 2 == 0:
+                t_tags.append(ALLOWED_ICON_TAGS[(t_idx + 2) % len(ALLOWED_ICON_TAGS)])
+
+            st_transfer = station_factory(
+                code=f"{prefix}st-tr-{run_id}-{t_idx+1}",
+                name=f"Correspondencia Hub {run_id}-{t_idx+1}",
+                x=1000.0 + (t_idx * 120.0),
+                y=1200.0 + ((t_idx % 4) * 150.0),
+                infrastructure_type="subterraneo" if t_idx % 2 == 0 else "elevado",
+                operational_status="operational",
+                is_transfer=True,
+                is_terminal=False,
+                terminal_lines=t_codes,
+                icon_tags=t_tags,
+            )
+            transfer_stations.append((st_transfer, assigned_lines_sample))
+
+            # Asignar slot de secuencia único en cada línea asignada
+            for ln in assigned_lines_sample:
+                # Buscar slot libre entre 1 y stations_per_line - 2
+                for candidate_seq in range(2, stations_per_line - 1):
+                    if candidate_seq not in line_transfer_slots[ln.id]:
+                        line_transfer_slots[ln.id][candidate_seq] = st_transfer
+                        break
+                else:
+                    # Fallback si todos los preferidos están llenos
+                    line_transfer_slots[ln.id][1] = st_transfer
+
+        # 4. Construir estaciones por cada línea y asociar LineStation
+        all_stations_dict = {st[0].id: st[0] for st in transfer_stations}
+        all_ls_to_create = []
+        by_line_and_branch = {}
+
+        for l_idx, line_obj in enumerate(created_lines):
+            by_line_and_branch[line_obj.code] = {}
+            main_stops_count = stations_per_line
+            main_stations = []
+
+            for seq in range(main_stops_count):
+                is_first = (seq == 0)
+                is_last = (seq == main_stops_count - 1)
+
+                if not is_first and not is_last and seq in line_transfer_slots[line_obj.id]:
+                    st = line_transfer_slots[line_obj.id][seq]
+                else:
+                    is_term = is_first or is_last
+                    st_tags = []
+                    if is_term:
+                        st_tags.append("terminal")
+                    elif seq % 3 == 0:
+                        st_tags.append(ALLOWED_ICON_TAGS[seq % len(ALLOWED_ICON_TAGS)])
+
+                    st = station_factory(
+                        code=f"{prefix}st-{run_id}-l{l_idx+1}-s{seq}",
+                        name=f"Estación {line_obj.code}-{seq+1}",
+                        x=800.0 + (seq * 110.0),
+                        y=800.0 + (l_idx * 180.0),
+                        infrastructure_type=["subterraneo", "superficial", "elevado", "tunel_profundo"][seq % 4],
+                        operational_status="operational",
+                        is_transfer=False,
+                        is_terminal=is_term,
+                        terminal_lines=[line_obj.code] if is_term else [],
+                        icon_tags=st_tags,
+                    )
+                all_stations_dict[st.id] = st
+                main_stations.append(st)
+
+                # Construir LineStation para bulk_create
+                wps = [[st.x + 20.0, st.y + 20.0]] if (seq % 5 == 1) else []
+                all_ls_to_create.append(
+                    LineStation(
+                        line=line_obj,
+                        station=st,
+                        sequence=seq,
+                        branch="main",
+                        segment_infrastructure=st.infrastructure_type,
+                        segment_status=st.operational_status,
+                        depth_meters=st.depth_meters,
+                        chainage_km=round(seq * 1.4, 2),
+                        waypoints=wps,
+                        correspondences_text="/".join(st.terminal_lines) if st.is_transfer else "",
+                    )
+                )
+
+            # Ramales adicionales si branches_per_line > 1
+            if branches_per_line > 1:
+                for b_idx in range(1, branches_per_line):
+                    branch_name = f"ramal_{b_idx}"
+                    branch_len = max(2, stations_per_line // 3)
+                    b_origin = main_stations[min(len(main_stations)-2, 3 + b_idx)]
+                    all_ls_to_create.append(
+                        LineStation(
+                            line=line_obj,
+                            station=b_origin,
+                            sequence=0,
+                            branch=branch_name,
+                            segment_infrastructure=b_origin.infrastructure_type,
+                            segment_status=b_origin.operational_status,
+                            depth_meters=b_origin.depth_meters,
+                            chainage_km=0.0,
+                            waypoints=[],
+                        )
+                    )
+                    for b_seq in range(1, branch_len):
+                        b_is_term = (b_seq == branch_len - 1)
+                        b_st = station_factory(
+                            code=f"{prefix}st-{run_id}-l{l_idx+1}-b{b_idx}-s{b_seq}",
+                            name=f"Ramal {line_obj.code}-{b_idx}-{b_seq}",
+                            x=b_origin.x + (b_seq * 90.0),
+                            y=b_origin.y + (b_seq * 120.0),
+                            infrastructure_type="elevado",
+                            operational_status="operational",
+                            is_transfer=False,
+                            is_terminal=b_is_term,
+                            terminal_lines=[line_obj.code] if b_is_term else [],
+                            icon_tags=["aeropuerto", "terminal"] if b_is_term else ["escuela"],
+                        )
+                        all_stations_dict[b_st.id] = b_st
+                        all_ls_to_create.append(
+                            LineStation(
+                                line=line_obj,
+                                station=b_st,
+                                sequence=b_seq,
+                                branch=branch_name,
+                                segment_infrastructure="elevado",
+                                segment_status="operational",
+                                depth_meters=14.0,
+                                chainage_km=round(b_seq * 1.6, 2),
+                                waypoints=[],
+                            )
+                        )
+
+        # 5. Inserción masiva de LineStation en base de datos (ultrarrápida < 0.2s)
+        created_ls_objs = LineStation.objects.bulk_create(all_ls_to_create, batch_size=500)
+
+        # 6. Sincronizar recuentos de paradas por línea
+        for l in created_lines:
+            l_stops = [ls for ls in created_ls_objs if ls.line_id == l.id]
+            l.declared_stations_count = len(l_stops)
+            l.operational_stations_count = len(l_stops)
+        TransitLine.objects.bulk_update(created_lines, ["declared_stations_count", "operational_stations_count"])
+
+        # 7. Organizar mapa by_line_and_branch y retornar bundle
+        for ls in created_ls_objs:
+            l_code = ls.line.code
+            b_name = ls.branch
+            if b_name not in by_line_and_branch[l_code]:
+                by_line_and_branch[l_code][b_name] = []
+            by_line_and_branch[l_code][b_name].append(ls)
+
+        all_stations_list = list(all_stations_dict.values())
+        line_stations_map = {(ls.line.code, ls.branch, ls.sequence): ls for ls in created_ls_objs}
+
+        return NetworkEntityBundle({
+            "all_lines": created_lines,
+            "all_stations": all_stations_list,
+            "all_line_stations": created_ls_objs,
+            "line_stations": line_stations_map,
+            "by_line_and_branch": by_line_and_branch,
+            "transfer_stations": [t[0] for t in transfer_stations],
+            "metro_lines": [l for l in created_lines if l.network_type == "metro"],
+            "brt_lines": [l for l in created_lines if l.network_type == "bus_articulado"],
+            "total_stations_count": len(all_stations_list),
+            "total_line_stations_count": len(created_ls_objs),
+            "total_lines_count": len(created_lines),
+        })
+
+    return _build_large_network
+
+
+@pytest.fixture
+def large_network(large_network_factory):
+    """
+    Red de gran tamaño (cientos de estaciones y registros LineStation ordenados por secuencia y ramas):
+    - 6 líneas de metro + 4 líneas de autobús articulado BRT (10 líneas en total).
+    - 20 estaciones por línea con ramales.
+    - ~180-220 estaciones físicas únicas y >200 registros LineStation.
+    - Correspondencias compartidas entre metro y BRT, terminal_lines recíprocas e icon_tags válidos.
+    - Tiempo de generación ultra bajo (< 0.5s).
+    """
+    return large_network_factory(
+        metro_lines=6,
+        brt_lines=4,
+        stations_per_line=20,
+        branches_per_line=1,
+        transfer_ratio=0.20,
+        prefix="lg",
+    )

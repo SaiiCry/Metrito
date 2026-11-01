@@ -26,6 +26,7 @@ ALLOWED_ICON_TAGS = {
 }
 
 from .models import CityOutline, TransitLine, Station, LineStation, OperationalAlert, UserNetworkEditLayer
+from .ridership import calculate_line_ridership, get_network_ridership_summary
 from .seed import (
     ESCALA_SVG_POR_KM,
     KM_POR_GRADO_LAT,
@@ -79,6 +80,7 @@ def api_network_data(request):
     ]
 
     lines_qs = TransitLine.objects.prefetch_related("line_stations__station", "alerts").all()
+    ridership_summary = get_network_ridership_summary(lines_qs)
     stations_qs = Station.objects.all()
 
     # Mapear qué líneas sirven a cada estación física
@@ -200,6 +202,10 @@ def api_network_data(request):
                 "rolling_stock": line.rolling_stock,
                 "traction_type": line.traction_type,
                 "annual_ridership_millions": line.annual_ridership_millions,
+                "projected_annual_ridership_35m": ridership_summary["by_line"].get(line.code, {}).get("projected_annual_ridership_millions"),
+                "real_vs_projected_ratio_35m": ridership_summary["by_line"].get(line.code, {}).get("real_vs_projected_ratio"),
+                "daily_passengers_weekday_35m": ridership_summary["by_line"].get(line.code, {}).get("daily_passengers_weekday"),
+                "passengers_per_km_annual": ridership_summary["by_line"].get(line.code, {}).get("passengers_per_km_millions"),
                 "current_occupancy_pct": line.current_occupancy_pct,
                 "min_curve_radius_m": line.min_curve_radius_m,
                 "superelevation_mm": line.superelevation_mm,
@@ -255,7 +261,13 @@ def api_network_data(request):
                 "metro_length_km": round(total_metro_km, 2),
                 "brt_length_km": round(total_brt_km, 2),
                 "active_alerts": sum(1 for a in alerts_list if a["is_active"]),
+                "annual_ridership_total_millions": ridership_summary["total_annual_ridership_real_millions"],
+                "projected_annual_demand_35m_millions": ridership_summary["total_annual_demand_projected_millions"],
+                "metro_annual_ridership_millions": ridership_summary["metro_annual_millions"],
+                "brt_annual_ridership_millions": ridership_summary["brt_annual_millions"],
+                "annual_trips_per_capita_35m": ridership_summary["annual_trips_per_capita"],
             },
+            "ridership_analytics_35m": ridership_summary,
         }
     )
 
@@ -389,16 +401,16 @@ def api_update_station(request, station_id):
     station.is_custom_modified = True
     station.save()
 
-    # Sincronizar los segmentos de LineStation asociados si el usuario cambió infraestructura/estado/profundidad
-    if any(k in payload for k in ("infrastructure_type", "operational_status", "depth_meters")):
-        for ls in LineStation.objects.filter(station=station):
-            if "infrastructure_type" in payload:
-                ls.segment_infrastructure = station.infrastructure_type
-            if "operational_status" in payload:
-                ls.segment_status = station.operational_status
-            if "depth_meters" in payload:
-                ls.depth_meters = station.depth_meters
-            ls.save()
+    # Sincronizar los segmentos de LineStation asociados en una única consulta SQL optimizada (sin N+1)
+    sync_fields = {}
+    if "infrastructure_type" in payload:
+        sync_fields["segment_infrastructure"] = station.infrastructure_type
+    if "operational_status" in payload:
+        sync_fields["segment_status"] = station.operational_status
+    if "depth_meters" in payload:
+        sync_fields["depth_meters"] = station.depth_meters
+    if sync_fields:
+        LineStation.objects.filter(station=station).update(**sync_fields)
 
     export_user_network_layer()
 
@@ -479,7 +491,7 @@ def api_update_segment_waypoints(request, ls_id):
     permitiendo moldear libremente curvas, codos y trayectorias de cualquier línea en el mapa.
     Si payload incluye 'snap': True (o snap_angle), aplica snap octilineal a múltiplos exactos de 45°.
     """
-    ls = get_object_or_404(LineStation, id=ls_id)
+    ls = get_object_or_404(LineStation.objects.select_related("station", "line"), id=ls_id)
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except json.JSONDecodeError:
@@ -692,9 +704,10 @@ def api_update_line_route(request, line_code):
                 else {int(raw_stops[0]["station_id"]), int(raw_stops[-1]["station_id"])}
             )
 
-        candidate_terminals = Station.objects.filter(
+        candidate_terminals = list(Station.objects.filter(
             models.Q(id__in=desired_term_ids) | models.Q(is_terminal=True)
-        )
+        ))
+        modified_terminals = []
         for st_candidate in candidate_terminals:
             cur_list = list(st_candidate.terminal_lines or [])
             has_code = line.code in cur_list
@@ -703,12 +716,14 @@ def api_update_line_route(request, line_code):
                 cur_list.append(line.code)
                 st_candidate.terminal_lines = cur_list
                 st_candidate.is_terminal = True
-                st_candidate.save(update_fields=["terminal_lines", "is_terminal"])
+                modified_terminals.append(st_candidate)
             elif not should_have and has_code:
                 cur_list = [c for c in cur_list if c != line.code]
                 st_candidate.terminal_lines = cur_list
                 st_candidate.is_terminal = len(cur_list) > 0
-                st_candidate.save(update_fields=["terminal_lines", "is_terminal"])
+                modified_terminals.append(st_candidate)
+        if modified_terminals:
+            Station.objects.bulk_update(modified_terminals, ["terminal_lines", "is_terminal"])
 
     export_user_network_layer()
 
@@ -1254,6 +1269,20 @@ def api_create_line_segment(request):
     st2 = Station.objects.filter(id=s2_id).first()
     if not st1 or not st2:
         return JsonResponse({"error": "Una o ambas estaciones no existen en la red."}, status=400)
+
+    # Validar restricción entre líneas: impedir conectar estaciones pertenecientes a otras líneas si no forman parte de esta línea
+    st1_lines = set(LineStation.objects.filter(station=st1).values_list("line_id", flat=True))
+    st2_lines = set(LineStation.objects.filter(station=st2).values_list("line_id", flat=True))
+
+    if st1_lines and line.id not in st1_lines:
+        return JsonResponse({
+            "error": f"La estación '{st1.name}' pertenece a otra línea y no a la Línea {line.code}. Para conectarla, incorpórala primero como correspondencia."
+        }, status=400)
+
+    if st2_lines and line.id not in st2_lines:
+        return JsonResponse({
+            "error": f"La estación '{st2.name}' pertenece a otra línea y no a la Línea {line.code}. Para conectarla, incorpórala primero como correspondencia."
+        }, status=400)
 
     # Validar duplicados en la línea: verificar si ya existe un tramo directo contiguo entre st1 y st2 en la misma rama
     branches_stops = {}

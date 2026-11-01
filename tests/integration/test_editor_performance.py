@@ -74,6 +74,214 @@ class TestEditorRendimiento:
         assert resp_line.status_code == 200
         assert t_line < 0.5, f"POST /api/lines/{line.code}/update/ excedió umbral: {t_line:.3f}s"
 
+    def test_drag_waypoints_performance_large_network_rendimiento(
+        self, api_client, large_network, django_assert_num_queries
+    ):
+        """
+        Medición del tiempo y consultas en la operación de arrastre/guardado de waypoints:
+        POST /api/line-segments/<id>/waypoints/ en una red grande (cientos de estaciones).
+        - Verifica ausencia de N+1 gracias al select_related y optimización de persistencia.
+        - Umbral de tiempo: < 0.25 segundos.
+        """
+        line = large_network["all_lines"][0]
+        ls = LineStation.objects.filter(line=line, branch="main", sequence=1).first()
+        assert ls is not None
+
+        new_waypoints = [
+            [float(ls.station.x) + 50.0, float(ls.station.y) + 50.0],
+            [float(ls.station.x) + 100.0, float(ls.station.y)],
+        ]
+
+        t0 = time.perf_counter()
+        with django_assert_num_queries(16):
+            resp = api_client.post(
+                f"/api/line-segments/{ls.id}/waypoints/",
+                data=json.dumps({"waypoints": new_waypoints, "snap": False}),
+                content_type="application/json",
+            )
+        elapsed = time.perf_counter() - t0
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert elapsed < 0.25, f"Guardado de waypoints tardó {elapsed:.3f}s (umbral 0.25s)"
+
+    def test_drag_station_coordinates_performance_large_network_rendimiento(
+        self, api_client, large_network, django_assert_num_queries
+    ):
+        """
+        Medición del tiempo y consultas en la operación de arrastre/guardado de posición de estación:
+        POST /api/stations/<id>/update/ en una estación de correspondencia de gran red.
+        - Sincroniza LineStation en 1 sola consulta SQL .update() sin iterar N+1.
+        - Umbral de tiempo: < 0.25 segundos.
+        """
+        transfer_station = large_network["transfer_stations"][0]
+        assert LineStation.objects.filter(station=transfer_station).count() >= 2
+
+        payload = {
+            "x": float(transfer_station.x) + 35.0,
+            "y": float(transfer_station.y) - 20.0,
+            "infrastructure_type": "subterranea_profunda",
+            "operational_status": "operational",
+        }
+
+        t0 = time.perf_counter()
+        with django_assert_num_queries(16):
+            resp = api_client.post(
+                f"/api/stations/{transfer_station.id}/update/",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+        elapsed = time.perf_counter() - t0
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert elapsed < 0.25, f"Arrastre de estación tardó {elapsed:.3f}s (umbral 0.25s)"
+
+    def test_save_line_route_performance_large_network_rendimiento(
+        self, api_client, large_network, django_assert_num_queries
+    ):
+        """
+        Medición de tiempo y consultas al guardar la ruta y geometría de una línea completa:
+        POST /api/lines/<line_code>/route/ en una red de cientos de estaciones.
+        - Utiliza bulk_create y bulk_update para terminales, eliminando N+1.
+        - Umbral de tiempo: < 0.35 segundos.
+        """
+        line = large_network["all_lines"][0]
+        stops_qs = LineStation.objects.filter(line=line).order_by("branch", "sequence")
+        stops_payload = [
+            {
+                "station_id": ls.station_id,
+                "branch": ls.branch,
+                "sequence": ls.sequence,
+                "waypoints": ls.waypoints or [],
+            }
+            for ls in stops_qs
+        ]
+
+        t0 = time.perf_counter()
+        with django_assert_num_queries(22):
+            resp = api_client.post(
+                f"/api/lines/{line.code}/route/",
+                data=json.dumps({"stops": stops_payload, "custom_geometry": []}),
+                content_type="application/json",
+            )
+        elapsed = time.perf_counter() - t0
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert elapsed < 0.35, f"Guardado de ruta de línea tardó {elapsed:.3f}s (umbral 0.35s)"
+
+    def test_create_station_performance_rendimiento(
+        self, api_client, large_network, django_assert_num_queries
+    ):
+        """
+        Medición de tiempo y consultas al agregar una estación nueva desde el editor:
+        POST /api/stations/create/.
+        - Umbral de tiempo: < 0.25 segundos.
+        """
+        payload = {
+            "name": "Nueva Estación Rendimiento",
+            "x": 3500.0,
+            "y": 2800.0,
+            "infrastructure_type": "elevada",
+            "icon_tags": ["aeropuerto", "centro_modal"],
+        }
+
+        t0 = time.perf_counter()
+        with django_assert_num_queries(14):
+            resp = api_client.post(
+                "/api/stations/create/",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+        elapsed = time.perf_counter() - t0
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert elapsed < 0.25, f"Creación de estación tardó {elapsed:.3f}s (umbral 0.25s)"
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestEditorErrorHandling:
+    """Pruebas exhaustivas de manejo de errores, códigos HTTP y validaciones estrictas."""
+
+    def test_drag_waypoints_resource_not_found(self, api_client):
+        """Verifica 404 al intentar actualizar waypoints de un segmento inexistente."""
+        resp = api_client.post(
+            "/api/line-segments/999999/waypoints/",
+            data=json.dumps({"waypoints": [[100.0, 100.0]]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+    def test_drag_waypoints_invalid_payload(self, api_client, minimal_network):
+        """Verifica 400 ante payloads inválidos o JSON malformado."""
+        ls = LineStation.objects.filter(line=minimal_network["line_1"]).first()
+        assert ls is not None
+
+        # 1. JSON no parseable
+        resp_bad_json = api_client.post(
+            f"/api/line-segments/{ls.id}/waypoints/",
+            data="not a json",
+            content_type="application/json",
+        )
+        assert resp_bad_json.status_code == 400
+
+        # 2. waypoints con tipo no lista
+        resp_bad_type = api_client.post(
+            f"/api/line-segments/{ls.id}/waypoints/",
+            data=json.dumps({"waypoints": "invalid"}),
+            content_type="application/json",
+        )
+        assert resp_bad_type.status_code == 400
+        assert "lista" in resp_bad_type.json().get("error", "").lower()
+
+    def test_station_update_resource_not_found(self, api_client):
+        """Verifica 404 al intentar actualizar una estación inexistente."""
+        resp = api_client.post(
+            "/api/stations/999999/update/",
+            data=json.dumps({"x": 100.0, "y": 100.0}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+    def test_cross_line_station_connection_restriction_error(self, api_client, large_network):
+        """
+        Verifica que al conectar un tramo en una línea, se impida conectar estaciones de otras líneas
+        retornando status 400 y mensaje de error explícito.
+        """
+        line_1 = large_network["all_lines"][0]
+        line_2 = large_network["all_lines"][1]
+
+        # Estación exclusiva de Line 1 (no transfer)
+        st_l1 = (
+            LineStation.objects.filter(line=line_1, station__is_transfer=False)
+            .first()
+            .station
+        )
+        # Estación exclusiva de Line 2 (no transfer)
+        st_l2 = (
+            LineStation.objects.filter(line=line_2, station__is_transfer=False)
+            .first()
+            .station
+        )
+
+        # Intentar conectar st_l1 con st_l2 dentro de Line 1
+        resp = api_client.post(
+            "/api/line-segments/create/",
+            data=json.dumps({
+                "line_code": line_1.code,
+                "from_station_id": st_l1.id,
+                "to_station_id": st_l2.id,
+            }),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+        data = resp.json()
+        assert "error" in data
+        assert "pertenece a otra línea" in data["error"].lower()
+
 
 @pytest.mark.integration
 class TestEditorSnap:

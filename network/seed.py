@@ -591,8 +591,8 @@ def export_user_network_layer() -> Dict[str, Any]:
 
     # Líneas con trayectos o waypoints modificados
     route_overrides = {}
-    for line in TransitLine.objects.all():
-        line_stops = LineStation.objects.filter(line=line).select_related("station").order_by("sequence")
+    for line in TransitLine.objects.prefetch_related("line_stations__station").all():
+        line_stops = sorted(line.line_stations.all(), key=lambda ls: ls.sequence)
         has_custom = (
             line.is_user_created
             or line.is_custom_modified

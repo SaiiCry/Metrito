@@ -416,26 +416,66 @@
             const selFrom = document.getElementById("newSegmentFromSelect");
             const selTo = document.getElementById("newSegmentToSelect");
 
-            if (selLine) {
-                selLine.innerHTML = NetworkStore.lines.map(l =>
-                    `<option value="${escapeHtml(l.code)}" ${NetworkStore.isolatedLineCode === l.code ? "selected" : ""}>Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
-                ).join("");
-            }
-            if (selFrom && selTo) {
-                const sortedStations = NetworkStore.getSortedStations();
-                const opts = sortedStations.map(s => {
-                    const lineLabel = s.lines && s.lines.length > 0 ? `(Líneas: ${s.lines.join("/")})` : "(Independiente)";
-                    return `<option value="${s.id}">${escapeHtml(s.name)} ${escapeHtml(lineLabel)}</option>`;
-                }).join("");
-                selFrom.innerHTML = opts;
-                selTo.innerHTML = opts;
-                if (fromId) selFrom.value = String(fromId);
-                if (toId) selTo.value = String(toId);
-                else if (fromId && sortedStations.length > 1) {
-                    const otherSt = sortedStations.find(s => s.id !== Number(fromId));
-                    if (otherSt) selTo.value = String(otherSt.id);
+            // Si fromId viene de una estación con línea, sincronizar línea por defecto
+            let defaultLineCode = NetworkStore.isolatedLineCode || document.getElementById("editLineSelect")?.value;
+            if (fromId) {
+                const stFrom = NetworkStore.stationsById.get(Number(fromId));
+                if (stFrom && Array.isArray(stFrom.lines) && stFrom.lines.length > 0) {
+                    defaultLineCode = stFrom.lines[0];
                 }
             }
+
+            if (selLine) {
+                selLine.innerHTML = NetworkStore.lines.map(l =>
+                    `<option value="${escapeHtml(l.code)}" ${defaultLineCode === l.code ? "selected" : ""}>Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
+                ).join("");
+            }
+
+            const updateStationSelects = () => {
+                const activeLineCode = selLine ? selLine.value : defaultLineCode;
+                const sortedStations = NetworkStore.getSortedStations();
+
+                const buildOptions = (currentVal) => {
+                    return sortedStations.map(s => {
+                        const hasLine = Array.isArray(s.lines) && s.lines.length > 0;
+                        const belongsToLine = !activeLineCode || (hasLine && s.lines.includes(activeLineCode));
+                        const isIndependent = !hasLine;
+                        const isForbidden = !belongsToLine && !isIndependent;
+                        const lineLabel = hasLine ? `(Líneas: ${s.lines.join("/")})` : "(Independiente)";
+                        const disAttr = isForbidden ? "disabled" : "";
+                        const note = isForbidden ? " [Otra línea]" : "";
+                        const selAttr = String(s.id) === String(currentVal) ? "selected" : "";
+                        return `<option value="${s.id}" ${disAttr} ${selAttr}>${escapeHtml(s.name)} ${escapeHtml(lineLabel)}${note}</option>`;
+                    }).join("");
+                };
+
+                if (selFrom && selTo) {
+                    const curFrom = selFrom.value || String(fromId || "");
+                    const curTo = selTo.value || String(toId || "");
+                    selFrom.innerHTML = buildOptions(curFrom);
+                    selTo.innerHTML = buildOptions(curTo);
+                }
+            };
+
+            updateStationSelects();
+
+            if (selLine && !selLine.dataset.hasSegmentSync) {
+                selLine.dataset.hasSegmentSync = "1";
+                selLine.addEventListener("change", () => updateStationSelects());
+            }
+
+            if (fromId && selFrom) selFrom.value = String(fromId);
+            if (toId && selTo) selTo.value = String(toId);
+            else if (fromId && selTo) {
+                const sortedStations = NetworkStore.getSortedStations();
+                const activeLineCode = selLine ? selLine.value : defaultLineCode;
+                const candidate = sortedStations.find(s =>
+                    s.id !== Number(fromId) &&
+                    (!activeLineCode || !s.lines || s.lines.length === 0 || s.lines.includes(activeLineCode))
+                );
+                if (candidate) selTo.value = String(candidate.id);
+            }
+
             modal.classList.remove("hidden");
         },
 
@@ -1533,6 +1573,56 @@
             return { ux: -1, uy: 0, isEndpoint: false };
         },
 
+        computeStationLabelPosition(st, radius, hasTopTerminalBadge = false) {
+            if (hasTopTerminalBadge) {
+                return { x: st.x, y: st.y + radius + 15.0, anchor: "middle" };
+            }
+
+            let avgDx = 0;
+            let avgDy = 0;
+            let count = 0;
+
+            for (const line of NetworkStore.lines) {
+                const stops = line.stops || [];
+                for (let i = 0; i < stops.length; i++) {
+                    if (stops[i].station_id === st.id) {
+                        if (i > 0) {
+                            const pSt = NetworkStore.stationsById.get(stops[i - 1].station_id);
+                            if (pSt) {
+                                avgDx += Math.abs(st.x - pSt.x);
+                                avgDy += Math.abs(st.y - pSt.y);
+                                count++;
+                            }
+                        }
+                        if (i < stops.length - 1) {
+                            const nSt = NetworkStore.stationsById.get(stops[i + 1].station_id);
+                            if (nSt) {
+                                avgDx += Math.abs(nSt.x - st.x);
+                                avgDy += Math.abs(nSt.y - st.y);
+                                count++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (count === 0 || (avgDx === 0 && avgDy === 0)) {
+                return { x: st.x, y: st.y - (radius + 6.0), anchor: "middle" };
+            }
+
+            const ratio = avgDy > 0 ? (avgDx / avgDy) : 999;
+            if (ratio > 1.8) {
+                // Trazado predominantemente horizontal -> Etiqueta ARRIBA
+                return { x: st.x, y: st.y - (radius + 6.0), anchor: "middle" };
+            } else if (ratio < 0.55) {
+                // Trazado predominantemente vertical -> Etiqueta a la DERECHA
+                return { x: st.x + radius + 8.0, y: st.y + 4.0, anchor: "start" };
+            } else {
+                // Trazado diagonal -> Etiqueta en DIAGONAL arriba-derecha
+                return { x: st.x + radius + 6.0, y: st.y - (radius + 4.0), anchor: "start" };
+            }
+        },
+
         renderTracksAndStations() {
             const tracksLayer = document.getElementById("svgLayerTracks");
             const trackHitsLayer = document.getElementById("svgLayerTrackHits");
@@ -1849,12 +1939,12 @@
                     const showLabel = st.is_transfer || st.is_terminal || hasTerm || st.is_premium_stop || isClosed || hasTags || Boolean(NetworkStore.isolatedLineCode);
                     if (showLabel) {
                         const fontSize = (st.is_transfer || hasTerm) ? 11.8 : 10.0;
-                        const dy = hasTopTerminalBadge ? (radius + 15.0) : -(radius + 6.0);
+                        const pos = this.computeStationLabelPosition(st, radius, hasTopTerminalBadge);
                         labelsHtml += `
-                            <text x="${st.x}" y="${st.y + dy}"
+                            <text x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}"
                                 font-size="${fontSize}" font-weight="${(st.is_transfer || hasTerm) ? 700 : 600}"
                                 fill="var(--text-primary)" stroke="var(--bg-canvas)" stroke-width="3.6"
-                                paint-order="stroke" text-anchor="middle" pointer-events="none">${escapeHtml(st.name)}</text>
+                                paint-order="stroke" text-anchor="${pos.anchor}" pointer-events="none">${escapeHtml(st.name)}</text>
                         `;
                     }
                 }
@@ -2926,6 +3016,28 @@
                 this.loadStationIntoEditor(stationId);
             }
 
+            // Sincronizar la línea asociada a la estación en todos los apartados del editor
+            const stationLines = Array.isArray(st.lines) ? st.lines : [];
+            if (stationLines.length > 0) {
+                const targetLineCode = (NetworkStore.isolatedLineCode && stationLines.includes(NetworkStore.isolatedLineCode))
+                    ? NetworkStore.isolatedLineCode
+                    : stationLines[0];
+
+                const edLineSel = document.getElementById("editLineSelect");
+                if (edLineSel && edLineSel.value !== String(targetLineCode)) {
+                    edLineSel.value = String(targetLineCode);
+                    this.loadLineIntoEditor(targetLineCode);
+                }
+                const newSegLineSel = document.getElementById("newSegmentLineSelect");
+                if (newSegLineSel && newSegLineSel.value !== String(targetLineCode)) {
+                    newSegLineSel.value = String(targetLineCode);
+                }
+                const modalCorrLineSel = document.getElementById("modalCorrLineSelect");
+                if (modalCorrLineSel) {
+                    modalCorrLineSel.value = String(targetLineCode);
+                }
+            }
+
             const panelEditor = document.getElementById("panelEditor");
             const isEditorActive = panelEditor && !panelEditor.classList.contains("hidden");
             if (!isEditorActive) {
@@ -3277,6 +3389,14 @@
             if (!ln) return;
             const sel = document.getElementById("editLineSelect");
             if (sel) sel.value = ln.code;
+            const newSegLineSel = document.getElementById("newSegmentLineSelect");
+            if (newSegLineSel && newSegLineSel.value !== String(ln.code)) {
+                newSegLineSel.value = String(ln.code);
+            }
+            const modalCorrLineSel = document.getElementById("modalCorrLineSelect");
+            if (modalCorrLineSel) {
+                modalCorrLineSel.value = String(ln.code);
+            }
             document.getElementById("editLineName").value = ln.name;
             document.getElementById("editLineColor").value = ln.color;
             document.getElementById("editLineColorPicker").value = ln.color;

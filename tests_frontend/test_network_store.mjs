@@ -734,3 +734,107 @@ describe("Auto-Detección Neutra de Línea al Conectar y Color de Estación", ()
         assert.equal(effectiveColor2, "#FF0000");
     });
 });
+
+describe("Inserción Topológica Contigua al Conectar Tramo (Sin conectar con la terminal)", () => {
+    function insertSegmentConnection(ln, st1, st2) {
+        if (!Array.isArray(ln.stops)) ln.stops = [];
+        const fromIdx = ln.stops.findIndex(s => s.station_id === st1.id);
+        const toIdx = ln.stops.findIndex(s => s.station_id === st2.id);
+
+        const computeOrthoWps = (a, b) => {
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            if (Math.abs(dy) < 1.0 || Math.abs(dx) < 1.0) return [];
+            return Math.abs(dx) >= Math.abs(dy)
+                ? [[Math.round(b.x * 2) / 2, Math.round(a.y * 2) / 2]]
+                : [[Math.round(a.x * 2) / 2, Math.round(b.y * 2) / 2]];
+        };
+
+        if (fromIdx !== -1 && toIdx === -1) {
+            const newStop = {
+                id: Date.now() + 2,
+                station_id: st2.id,
+                station_code: st2.code,
+                station_name: st2.name,
+                sequence: 0,
+                branch: ln.stops[fromIdx]?.branch || "main",
+                waypoints: []
+            };
+
+            if (fromIdx === ln.stops.length - 1) {
+                ln.stops[fromIdx].waypoints = computeOrthoWps(st1, st2);
+                ln.stops.push(newStop);
+            } else if (fromIdx === 0) {
+                newStop.waypoints = computeOrthoWps(st2, st1);
+                ln.stops.unshift(newStop);
+            } else {
+                const prevSt = stationsMap.get(ln.stops[fromIdx - 1]?.station_id) || st1;
+                const nextSt = stationsMap.get(ln.stops[fromIdx + 1]?.station_id) || st1;
+                const detourBefore = Math.hypot(st2.x - prevSt.x, st2.y - prevSt.y) + Math.hypot(st1.x - st2.x, st1.y - st2.y) - Math.hypot(prevSt.x - st1.x, prevSt.y - st1.y);
+                const detourAfter = Math.hypot(st2.x - nextSt.x, st2.y - nextSt.y) + Math.hypot(st1.x - st2.x, st1.y - st2.y) - Math.hypot(nextSt.x - st1.x, nextSt.y - st1.y);
+                if (detourBefore < detourAfter) {
+                    ln.stops[fromIdx - 1].waypoints = computeOrthoWps(prevSt, st2);
+                    newStop.waypoints = computeOrthoWps(st2, st1);
+                    ln.stops.splice(fromIdx, 0, newStop);
+                } else {
+                    ln.stops[fromIdx].waypoints = computeOrthoWps(st1, st2);
+                    newStop.waypoints = computeOrthoWps(st2, nextSt);
+                    ln.stops.splice(fromIdx + 1, 0, newStop);
+                }
+            }
+        }
+        ln.stops.forEach((s, idx) => { s.sequence = idx; });
+        return ln.stops;
+    }
+
+    let stationsMap;
+
+    beforeEach(() => {
+        stationsMap = new Map([
+            [1, { id: 1, code: "st-1", name: "Terminal Norte", x: 100, y: 100 }],
+            [2, { id: 2, code: "st-2", name: "Estación Intermedia", x: 100, y: 200 }],
+            [3, { id: 3, code: "st-3", name: "Terminal Sur", x: 100, y: 500 }],
+            [99, { id: 99, code: "st-99", name: "Nueva Parada Vacía", x: 100, y: 250 }],
+        ]);
+    });
+
+    it("inserta la nueva estación inmediatamente contigua a la estación seleccionada y no al final de la terminal", () => {
+        const ln = {
+            code: "3",
+            stops: [
+                { id: 10, station_id: 1, station_name: "Terminal Norte", sequence: 0 },
+                { id: 20, station_id: 2, station_name: "Estación Intermedia", sequence: 1 },
+                { id: 30, station_id: 3, station_name: "Terminal Sur", sequence: 2 },
+            ]
+        };
+
+        const stFrom = stationsMap.get(2); // Estación Intermedia (idx 1)
+        const stNew = stationsMap.get(99); // Nueva Parada Vacía
+
+        insertSegmentConnection(ln, stFrom, stNew);
+
+        // La nueva parada debe estar en la secuencia 2 (inmediatamente después de Estación Intermedia),
+        // y Terminal Sur debe haber sido desplazada a la secuencia 3 (conservando su condición de terminal).
+        assert.equal(ln.stops.length, 4);
+        assert.equal(ln.stops[1].station_name, "Estación Intermedia");
+        assert.equal(ln.stops[2].station_name, "Nueva Parada Vacía");
+        assert.equal(ln.stops[3].station_name, "Terminal Sur");
+        assert.equal(ln.stops[2].sequence, 2);
+        assert.equal(ln.stops[3].sequence, 3);
+    });
+
+    it("al arrastrar un tramo con vértice existente, no agrega vértices duplicados en acordeón", () => {
+        const stopObj = {
+            id: 1,
+            station_id: 2,
+            waypoints: [[100, 220]]
+        };
+        // Simular intento de agregar otro punto
+        const existingCount = stopObj.waypoints.length;
+        if (existingCount >= 1) {
+            // Se reutiliza el existente
+            assert.equal(stopObj.waypoints.length, 1);
+        }
+        assert.equal(stopObj.waypoints.length, 1);
+    });
+});

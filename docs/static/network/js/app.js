@@ -936,31 +936,130 @@
 
                 if (ln && st1 && st2) {
                     if (!Array.isArray(ln.stops)) ln.stops = [];
-                    const hasFrom = ln.stops.some(s => s.station_id === fromId);
-                    const hasTo = ln.stops.some(s => s.station_id === toId);
+                    const fromIdx = ln.stops.findIndex(s => s.station_id === fromId);
+                    const toIdx = ln.stops.findIndex(s => s.station_id === toId);
 
-                    if (!hasFrom) {
-                        ln.stops.push({
-                            id: Date.now() + 1,
-                            station_id: fromId,
-                            station_code: st1.code,
-                            station_name: st1.name,
-                            sequence: ln.stops.length,
-                            branch: "main",
-                            waypoints: []
-                        });
-                    }
-                    if (!hasTo) {
-                        ln.stops.push({
+                    const computeOrthoWps = (a, b) => {
+                        const dx = b.x - a.x;
+                        const dy = b.y - a.y;
+                        if (Math.abs(dy) < 1.0 || Math.abs(dx) < 1.0) return [];
+                        return Math.abs(dx) >= Math.abs(dy)
+                            ? [[Math.round(b.x * 2) / 2, Math.round(a.y * 2) / 2]]
+                            : [[Math.round(a.x * 2) / 2, Math.round(b.y * 2) / 2]];
+                    };
+
+                    if (fromIdx !== -1 && toIdx === -1) {
+                        // st1 ya pertenece a la línea; insertar st2 contiguamente a st1 (nunca al final/terminal)
+                        const newStop = {
                             id: Date.now() + 2,
                             station_id: toId,
                             station_code: st2.code,
                             station_name: st2.name,
-                            sequence: ln.stops.length,
+                            sequence: 0,
+                            branch: ln.stops[fromIdx]?.branch || "main",
+                            segment_infrastructure: st2.infrastructure_type || "subterraneo",
+                            segment_status: st2.operational_status || "operational",
+                            depth_meters: st2.depth_meters || 0,
+                            waypoints: []
+                        };
+
+                        if (fromIdx === ln.stops.length - 1) {
+                            ln.stops[fromIdx].waypoints = computeOrthoWps(st1, st2);
+                            ln.stops.push(newStop);
+                        } else if (fromIdx === 0) {
+                            newStop.waypoints = computeOrthoWps(st2, st1);
+                            ln.stops.unshift(newStop);
+                        } else {
+                            const prevSt = NetworkStore.stationsById.get(ln.stops[fromIdx - 1]?.station_id) || st1;
+                            const nextSt = NetworkStore.stationsById.get(ln.stops[fromIdx + 1]?.station_id) || st1;
+                            const detourBefore = Math.hypot(st2.x - prevSt.x, st2.y - prevSt.y) + Math.hypot(st1.x - st2.x, st1.y - st2.y) - Math.hypot(prevSt.x - st1.x, prevSt.y - st1.y);
+                            const detourAfter = Math.hypot(st2.x - nextSt.x, st2.y - nextSt.y) + Math.hypot(st1.x - st2.x, st1.y - st2.y) - Math.hypot(nextSt.x - st1.x, nextSt.y - st1.y);
+                            if (detourBefore < detourAfter) {
+                                ln.stops[fromIdx - 1].waypoints = computeOrthoWps(prevSt, st2);
+                                newStop.waypoints = computeOrthoWps(st2, st1);
+                                ln.stops.splice(fromIdx, 0, newStop);
+                            } else {
+                                ln.stops[fromIdx].waypoints = computeOrthoWps(st1, st2);
+                                newStop.waypoints = computeOrthoWps(st2, nextSt);
+                                ln.stops.splice(fromIdx + 1, 0, newStop);
+                            }
+                        }
+                    } else if (fromIdx === -1 && toIdx !== -1) {
+                        // st2 ya pertenece a la línea; insertar st1 contiguamente a st2
+                        const newStop = {
+                            id: Date.now() + 1,
+                            station_id: fromId,
+                            station_code: st1.code,
+                            station_name: st1.name,
+                            sequence: 0,
+                            branch: ln.stops[toIdx]?.branch || "main",
+                            segment_infrastructure: st1.infrastructure_type || "subterraneo",
+                            segment_status: st1.operational_status || "operational",
+                            depth_meters: st1.depth_meters || 0,
+                            waypoints: []
+                        };
+
+                        if (toIdx === ln.stops.length - 1) {
+                            ln.stops[toIdx].waypoints = computeOrthoWps(st2, st1);
+                            ln.stops.push(newStop);
+                        } else if (toIdx === 0) {
+                            newStop.waypoints = computeOrthoWps(st1, st2);
+                            ln.stops.unshift(newStop);
+                        } else {
+                            const prevSt = NetworkStore.stationsById.get(ln.stops[toIdx - 1]?.station_id) || st2;
+                            const nextSt = NetworkStore.stationsById.get(ln.stops[toIdx + 1]?.station_id) || st2;
+                            const detourBefore = Math.hypot(st1.x - prevSt.x, st1.y - prevSt.y) + Math.hypot(st2.x - st1.x, st2.y - st1.y) - Math.hypot(prevSt.x - st2.x, prevSt.y - st2.y);
+                            const detourAfter = Math.hypot(st1.x - nextSt.x, st1.y - nextSt.y) + Math.hypot(st2.x - st1.x, st2.y - st1.y) - Math.hypot(nextSt.x - st2.x, nextSt.y - st2.y);
+                            if (detourBefore < detourAfter) {
+                                ln.stops[toIdx - 1].waypoints = computeOrthoWps(prevSt, st1);
+                                newStop.waypoints = computeOrthoWps(st1, st2);
+                                ln.stops.splice(toIdx, 0, newStop);
+                            } else {
+                                ln.stops[toIdx].waypoints = computeOrthoWps(st2, st1);
+                                newStop.waypoints = computeOrthoWps(st1, nextSt);
+                                ln.stops.splice(toIdx + 1, 0, newStop);
+                            }
+                        }
+                    } else if (fromIdx === -1 && toIdx === -1) {
+                        // Ninguna estación está en la línea: agregar ambas en orden contiguo
+                        const s1Obj = {
+                            id: Date.now() + 1,
+                            station_id: fromId,
+                            station_code: st1.code,
+                            station_name: st1.name,
+                            sequence: 0,
+                            branch: "main",
+                            waypoints: computeOrthoWps(st1, st2)
+                        };
+                        const s2Obj = {
+                            id: Date.now() + 2,
+                            station_id: toId,
+                            station_code: st2.code,
+                            station_name: st2.name,
+                            sequence: 1,
                             branch: "main",
                             waypoints: []
-                        });
+                        };
+                        ln.stops.push(s1Obj, s2Obj);
+                    } else {
+                        // Ambas ya estaban en la línea; si no son contiguas, reubicar toId junto a fromId
+                        if (Math.abs(fromIdx - toIdx) > 1) {
+                            const [moved] = ln.stops.splice(toIdx, 1);
+                            const newFromIdx = ln.stops.findIndex(s => s.station_id === fromId);
+                            ln.stops.splice(newFromIdx + 1, 0, moved);
+                            ln.stops[newFromIdx].waypoints = computeOrthoWps(st1, st2);
+                        } else {
+                            const minIdx = Math.min(fromIdx, toIdx);
+                            const maxIdx = Math.max(fromIdx, toIdx);
+                            const sA = NetworkStore.stationsById.get(ln.stops[minIdx].station_id);
+                            const sB = NetworkStore.stationsById.get(ln.stops[maxIdx].station_id);
+                            if (sA && sB) {
+                                ln.stops[minIdx].waypoints = computeOrthoWps(sA, sB);
+                            }
+                        }
                     }
+
+                    ln.stops.forEach((s, idx) => { s.sequence = idx; });
                     ln.declared_stations_count = ln.stops.length;
                     ln.is_custom_modified = true;
 
@@ -975,7 +1074,7 @@
                         edits.stations[toId] = { lines: st2.lines, is_transfer: st2.is_transfer };
                         this.saveStoredEdits(edits);
                     }
-                    return { ok: true, server: false, line_code: lineCode };
+                    return { ok: true, server: false, line_code: lineCode, total_stops: ln.stops.length };
                 }
             }
 
@@ -3319,11 +3418,26 @@
             }
 
             // 3. Si las estaciones ya están alineadas en el mismo eje (dx < 1 o dy < 1):
-            if (absDx < 1.0 || absDy < 1.0) {
-                const octPrev = this.snapPointOctilinear([x0, y0], [mx, my]);
-                addCandidate(octPrev[0], octPrev[1], 1.0);
-                const octNext = this.snapPointOctilinear([x1, y1], [mx, my]);
-                addCandidate(octNext[0], octNext[1], 1.0);
+            if (absDx < 1.0) {
+                // Eje vertical: si el ratón está cerca, snap a la recta directa
+                if (Math.abs(mx - x0) < 22.0) {
+                    addCandidate(x0, Math.round(my * 2) / 2, 2.5);
+                } else {
+                    // Desvío simétrico a 45° en chevron
+                    const halfH = absDy / 2;
+                    addCandidate(x0 + halfH, (y0 + y1) / 2, 1.6);
+                    addCandidate(x0 - halfH, (y0 + y1) / 2, 1.6);
+                }
+            } else if (absDy < 1.0) {
+                // Eje horizontal: si el ratón está cerca, snap a la recta directa
+                if (Math.abs(my - y0) < 22.0) {
+                    addCandidate(Math.round(mx * 2) / 2, y0, 2.5);
+                } else {
+                    // Desvío simétrico a 45° en chevron
+                    const halfW = absDx / 2;
+                    addCandidate((x0 + x1) / 2, y0 + halfW, 1.6);
+                    addCandidate((x0 + x1) / 2, y0 - halfW, 1.6);
+                }
             }
 
             let best = null;
@@ -3671,12 +3785,37 @@
                         const st2 = NetworkStore.stationsById.get(s2Id) || stopObj;
                         if (!Array.isArray(stopObj.waypoints)) stopObj.waypoints = [];
                         const oldWaypoints = JSON.parse(JSON.stringify(stopObj.waypoints));
-                        const pts = [[st1.x, st1.y], ...stopObj.waypoints, [st2.x, st2.y]];
-                        const insertIdx = this.findClosestSegmentInsertIndex(pts, svgPt.x, svgPt.y);
-                        const anchor = pts[insertIdx];
-                        const nextAnchor = pts[insertIdx + 1] || [st2.x, st2.y];
-                        const snappedPt = this.snapWaypoint(anchor, nextAnchor, [svgPt.x, svgPt.y]);
-                        stopObj.waypoints.splice(insertIdx, 0, snappedPt);
+
+                        // Si ya existe al menos 1 vértice en este tramo, reutilizar el más cercano
+                        // para evitar la formación de zigzags o acordeones de múltiples puntos
+                        if (stopObj.waypoints.length >= 1) {
+                            let closestWpIdx = 0;
+                            let closestDist = Infinity;
+                            stopObj.waypoints.forEach((wp, wIdx) => {
+                                const d = Math.hypot(wp[0] - svgPt.x, wp[1] - svgPt.y);
+                                if (d < closestDist) {
+                                    closestDist = d;
+                                    closestWpIdx = wIdx;
+                                }
+                            });
+                            this.dragTarget = {
+                                type: "waypoint",
+                                lineCode,
+                                lsId,
+                                stopObj,
+                                wpIdx: closestWpIdx,
+                                s1Id,
+                                s2Id,
+                                oldWaypoints,
+                                moved: true
+                            };
+                            this.viewport.setPointerCapture(e.pointerId);
+                            return;
+                        }
+
+                        // Si el tramo era recto, crear exactamente un vértice ortogonal limpio a 90° o 45°
+                        const snappedPt = this.snapWaypoint([st1.x, st1.y], [st2.x, st2.y], [svgPt.x, svgPt.y]);
+                        stopObj.waypoints = [snappedPt];
                         this.renderTracksAndStations();
                         this.renderEditHandles();
                         this.dragTarget = {
@@ -3684,7 +3823,7 @@
                             lineCode,
                             lsId,
                             stopObj,
-                            wpIdx: insertIdx,
+                            wpIdx: 0,
                             s1Id,
                             s2Id,
                             oldWaypoints,
@@ -4776,13 +4915,17 @@
         populateEditorSelects() {
             const lineSel = document.getElementById("editLineSelect");
             const alertLineSel = document.getElementById("newAlertLine");
+            const curLineCode = lineSel?.value || NetworkStore.activeLineCode || NetworkStore.isolatedLineCode || (NetworkStore.lines[0]?.code || "1");
             if (lineSel && alertLineSel) {
                 const opts = NetworkStore.lines.map(
                     l => `<option value="${escapeHtml(l.code)}">${escapeHtml(l.name)}: ${escapeHtml(l.route_title)}</option>`
                 ).join("");
                 lineSel.innerHTML = opts;
                 alertLineSel.innerHTML = opts;
-                this.loadLineIntoEditor(NetworkStore.lines[0]?.code);
+                if (curLineCode) {
+                    lineSel.value = curLineCode;
+                }
+                this.loadLineIntoEditor(curLineCode);
             }
 
             const stPrimaryLineSel = document.getElementById("editStationPrimaryLine");
@@ -4804,10 +4947,6 @@
                 this.loadStationIntoEditor(NetworkStore.stations[0].id);
             }
 
-            if (lineSel && NetworkStore.lines[0]) {
-                this.loadLineIntoEditor(NetworkStore.lines[0].code);
-            }
-
             const citySel = document.getElementById("editCitySelect");
             if (citySel) {
                 citySel.innerHTML = NetworkStore.cityOutlines.map(
@@ -4820,10 +4959,21 @@
         },
 
         loadLineIntoEditor(lineCode) {
-            const ln = NetworkStore.linesByCode.get(lineCode);
+            const ln = NetworkStore.linesByCode.get(String(lineCode));
             if (!ln) return;
+            NetworkStore.activeLineCode = String(ln.code);
             const sel = document.getElementById("editLineSelect");
-            if (sel) sel.value = ln.code;
+            if (sel && sel.value !== String(ln.code)) sel.value = String(ln.code);
+
+            // Sincronizar barra de herramientas activa y badge de color
+            if (typeof VisualEditorTools !== "undefined" && typeof VisualEditorTools.setActiveLine === "function") {
+                VisualEditorTools.setActiveLine(String(ln.code));
+            }
+            const edSel = document.getElementById("edActiveLineSelect");
+            if (edSel && edSel.value !== String(ln.code)) edSel.value = String(ln.code);
+            const badgeDot = document.getElementById("activeLineBadgeDot");
+            if (badgeDot) badgeDot.style.background = ln.color || "#0055A4";
+
             const newSegLineSel = document.getElementById("newSegmentLineSelect");
             if (newSegLineSel && newSegLineSel.value !== String(ln.code)) {
                 newSegLineSel.value = String(ln.code);
@@ -5283,6 +5433,7 @@
                     NetworkStore.isolatedLineCode = code;
                     document.getElementById("btnIsolateClear")?.removeAttribute("hidden");
                 }
+                this.loadLineIntoEditor(code);
                 this.renderLinesDirectory();
                 SchematicMapEngine.renderTracksAndStations();
                 if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
@@ -5356,8 +5507,10 @@
                         this.selectStation(stId);
                     }
                 } else if (item.dataset.type === "line") {
-                    NetworkStore.isolatedLineCode = item.dataset.code;
+                    const code = item.dataset.code;
+                    NetworkStore.isolatedLineCode = code;
                     document.getElementById("btnIsolateClear")?.removeAttribute("hidden");
+                    this.loadLineIntoEditor(code);
                     this.renderLinesDirectory();
                     SchematicMapEngine.renderTracksAndStations();
                 }
@@ -5621,7 +5774,10 @@
 
             // Selectores del Editor de Datos
             document.getElementById("editLineSelect")?.addEventListener("change", (e) => {
-                this.loadLineIntoEditor(e.target.value);
+                const code = e.target.value;
+                this.loadLineIntoEditor(code);
+                NetworkStore.isolatedLineCode = code;
+                SchematicMapEngine.renderTracksAndStations();
             });
             document.getElementById("editLineColorPicker")?.addEventListener("input", (e) => {
                 document.getElementById("editLineColor").value = e.target.value;

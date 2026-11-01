@@ -1418,7 +1418,32 @@ def api_create_line_segment(request):
                 depth_meters=st2.depth_meters, waypoints=segment_wps
             )
         elif st1_ls and not st2_ls:
-            insert_seq = st1_ls.sequence + 1
+            last_seq = LineStation.objects.filter(line=line, branch=st1_ls.branch).order_by("-sequence").values_list("sequence", flat=True).first()
+            if st1_ls.sequence == 0 and last_seq is not None and last_seq > 0:
+                next_ls = LineStation.objects.filter(line=line, branch=st1_ls.branch, sequence=1).select_related("station").first()
+                if next_ls:
+                    d_before = math.hypot(float(st2.x) - float(st1.x), float(st2.y) - float(st1.y))
+                    d_after = math.hypot(float(st2.x) - float(next_ls.station.x), float(st2.y) - float(next_ls.station.y))
+                    insert_seq = 0 if d_before < d_after else 1
+                else:
+                    insert_seq = 1
+            elif last_seq is not None and st1_ls.sequence == last_seq:
+                insert_seq = last_seq + 1
+            else:
+                prev_ls = LineStation.objects.filter(line=line, branch=st1_ls.branch, sequence=st1_ls.sequence - 1).select_related("station").first()
+                next_ls = LineStation.objects.filter(line=line, branch=st1_ls.branch, sequence=st1_ls.sequence + 1).select_related("station").first()
+                detour_before = (
+                    math.hypot(float(st2.x) - float(prev_ls.station.x), float(st2.y) - float(prev_ls.station.y)) +
+                    math.hypot(float(st1.x) - float(st2.x), float(st1.y) - float(st2.y)) -
+                    math.hypot(float(prev_ls.station.x) - float(st1.x), float(prev_ls.station.y) - float(st1.y))
+                ) if prev_ls else 1e9
+                detour_after = (
+                    math.hypot(float(st2.x) - float(next_ls.station.x), float(st2.y) - float(next_ls.station.y)) +
+                    math.hypot(float(st1.x) - float(st2.x), float(st1.y) - float(st2.y)) -
+                    math.hypot(float(next_ls.station.x) - float(st1.x), float(next_ls.station.y) - float(st1.y))
+                ) if next_ls else 1e9
+                insert_seq = st1_ls.sequence if detour_before < detour_after else (st1_ls.sequence + 1)
+
             _shift_sequences_forward(insert_seq, st1_ls.branch)
             LineStation.objects.create(
                 line=line, station=st2, sequence=insert_seq, branch=st1_ls.branch,
@@ -1426,7 +1451,32 @@ def api_create_line_segment(request):
                 depth_meters=st2.depth_meters, waypoints=segment_wps
             )
         elif not st1_ls and st2_ls:
-            insert_seq = st2_ls.sequence
+            last_seq = LineStation.objects.filter(line=line, branch=st2_ls.branch).order_by("-sequence").values_list("sequence", flat=True).first()
+            if st2_ls.sequence == 0 and last_seq is not None and last_seq > 0:
+                next_ls = LineStation.objects.filter(line=line, branch=st2_ls.branch, sequence=1).select_related("station").first()
+                if next_ls:
+                    d_before = math.hypot(float(st1.x) - float(st2.x), float(st1.y) - float(st2.y))
+                    d_after = math.hypot(float(st1.x) - float(next_ls.station.x), float(st1.y) - float(next_ls.station.y))
+                    insert_seq = 0 if d_before < d_after else 1
+                else:
+                    insert_seq = 1
+            elif last_seq is not None and st2_ls.sequence == last_seq:
+                insert_seq = last_seq + 1
+            else:
+                prev_ls = LineStation.objects.filter(line=line, branch=st2_ls.branch, sequence=st2_ls.sequence - 1).select_related("station").first()
+                next_ls = LineStation.objects.filter(line=line, branch=st2_ls.branch, sequence=st2_ls.sequence + 1).select_related("station").first()
+                detour_before = (
+                    math.hypot(float(st1.x) - float(prev_ls.station.x), float(st1.y) - float(prev_ls.station.y)) +
+                    math.hypot(float(st2.x) - float(st1.x), float(st2.y) - float(st1.y)) -
+                    math.hypot(float(prev_ls.station.x) - float(st2.x), float(prev_ls.station.y) - float(st2.y))
+                ) if prev_ls else 1e9
+                detour_after = (
+                    math.hypot(float(st1.x) - float(next_ls.station.x), float(st1.y) - float(next_ls.station.y)) +
+                    math.hypot(float(st2.x) - float(st1.x), float(st2.y) - float(st1.y)) -
+                    math.hypot(float(next_ls.station.x) - float(st2.x), float(next_ls.station.y) - float(st2.y))
+                ) if next_ls else 1e9
+                insert_seq = st2_ls.sequence if detour_before < detour_after else (st2_ls.sequence + 1)
+
             _shift_sequences_forward(insert_seq, st2_ls.branch)
             LineStation.objects.create(
                 line=line, station=st1, sequence=insert_seq, branch=st2_ls.branch,

@@ -47,14 +47,30 @@
 
         async fetchAll(customFetch = globalThis.fetch) {
             let resp;
-            try {
-                resp = await customFetch("/api/network/");
-                if (!resp || !resp.ok) {
-                    throw new Error("Fallback to static data");
+            const apiBase = (typeof ApiClient !== "undefined" && typeof ApiClient.getApiBase === "function") ? ApiClient.getApiBase() : "";
+            const isStaticDefault = (typeof window !== "undefined" && (window.location.hostname.includes("github.io") || window.location.protocol === "file:")) && !apiBase;
+
+            if (!isStaticDefault) {
+                try {
+                    const url = apiBase ? `${apiBase}/api/network/` : "/api/network/";
+                    resp = await customFetch(url);
+                    if (!resp || !resp.ok) {
+                        throw new Error("Fallback to static data");
+                    }
+                    if (typeof ApiClient !== "undefined" && typeof ApiClient.updateConnectionStatusBadge === "function") {
+                        ApiClient.updateConnectionStatusBadge(true);
+                    }
+                } catch (err) {
+                    resp = await customFetch("data/network.json");
+                    if (typeof ApiClient !== "undefined" && typeof ApiClient.updateConnectionStatusBadge === "function") {
+                        ApiClient.updateConnectionStatusBadge(false);
+                    }
                 }
-            } catch (err) {
-                // Modo estático autónomo para alojamiento en GitHub Pages
+            } else {
                 resp = await customFetch("data/network.json");
+                if (typeof ApiClient !== "undefined" && typeof ApiClient.updateConnectionStatusBadge === "function") {
+                    ApiClient.updateConnectionStatusBadge(false);
+                }
             }
             if (!resp || !resp.ok) throw new Error("Error cargando topología de la red SMyT");
             const data = await resp.json();
@@ -121,6 +137,63 @@
         STORAGE_KEY: "simma_user_network_edits_v1",
         isServerAvailable: null,
 
+        getApiBase() {
+            if (typeof window === "undefined") return "";
+            try {
+                const stored = localStorage.getItem("metrito_api_url");
+                if (stored && stored.trim()) {
+                    return stored.trim().replace(/\/+$/, "");
+                }
+                if (window.METRITO_API_URL && window.METRITO_API_URL.trim()) {
+                    return window.METRITO_API_URL.trim().replace(/\/+$/, "");
+                }
+            } catch (e) {}
+            if (typeof window !== "undefined" && window.location.hostname.includes("vercel.app")) {
+                return "";
+            }
+            return "";
+        },
+
+        setApiBase(url) {
+            try {
+                if (!url || !url.trim()) {
+                    localStorage.removeItem("metrito_api_url");
+                } else {
+                    localStorage.setItem("metrito_api_url", url.trim().replace(/\/+$/, ""));
+                }
+            } catch (e) {}
+            this.updateConnectionStatusBadge();
+        },
+
+        initBadgeClickHandler() {
+            if (typeof document === "undefined") return;
+            const badge = document.getElementById("storageSyncBadge");
+            if (!badge || badge._hasClickHandler) return;
+            badge._hasClickHandler = true;
+            badge.style.cursor = "pointer";
+            badge.addEventListener("click", () => {
+                const current = this.getApiBase();
+                const input = prompt(
+                    "Conectar con Base de Datos en Vercel:\n\nIngresa la URL de tu backend en Vercel (ejemplo: https://tu-proyecto.vercel.app)\no deja el campo vacío para operar en Modo Autónomo / GitHub Pages (almacenamiento local):",
+                    current || ""
+                );
+                if (input !== null) {
+                    this.setApiBase(input);
+                    if (input.trim()) {
+                        showToast("URL de Vercel configurada. Comprobando conexión...");
+                        NetworkStore.fetchAll().then(() => {
+                            showToast("✓ Conectado a Vercel y base de datos");
+                        }).catch(() => {
+                            showToast("No se pudo conectar a la API de Vercel. Operando en modo local.");
+                        });
+                    } else {
+                        showToast("Modo autónomo activado (GitHub Pages + almacenamiento local).");
+                        NetworkStore.fetchAll();
+                    }
+                }
+            });
+        },
+
         getStoredEdits() {
             try {
                 const raw = localStorage.getItem(this.STORAGE_KEY);
@@ -152,20 +225,27 @@
             }
             const badge = document.getElementById("storageSyncBadge");
             if (!badge) return;
+            badge.style.cursor = "pointer";
             const edits = this.getStoredEdits();
             const editCount = (edits.createdStations?.length || 0) +
                 (edits.createdLines?.length || 0) +
                 Object.keys(edits.stations || {}).length +
                 Object.keys(edits.lines || {}).length;
 
+            const apiBase = this.getApiBase();
             if (this.isServerAvailable) {
+                const target = apiBase ? "Vercel API" : "Servidor";
                 badge.className = "storage-sync-pill online";
-                badge.innerHTML = `<span class="sync-dot online"></span> Conectado a Servidor (${editCount} cambios)`;
-                badge.title = "Los cambios se sincronizan con la base de datos PostgreSQL/SQLite y se respaldan localmente.";
+                badge.innerHTML = `<span class="sync-dot online"></span> Conectado a ${target} (${editCount} cambios)`;
+                badge.title = `Sincronización activa con la base de datos (${apiBase || "mismo origen"}). Clic para cambiar URL de Vercel.`;
+            } else if (apiBase) {
+                badge.className = "storage-sync-pill local";
+                badge.innerHTML = `<span class="sync-dot local"></span> Vercel desconectado (${editCount} cambios locales)`;
+                badge.title = `No se pudo conectar a ${apiBase}. Clic para reconfigurar URL de Vercel.`;
             } else {
                 badge.className = "storage-sync-pill local";
-                badge.innerHTML = `<span class="sync-dot local"></span> Modo Autónomo / GitHub Pages (${editCount} cambios guardados)`;
-                badge.title = "Guardado local activo en el navegador. Puedes exportar un respaldo JSON en cualquier momento.";
+                badge.innerHTML = `<span class="sync-dot local"></span> GitHub Pages / Autónomo (${editCount} cambios guardados)`;
+                badge.title = "Guardado local activo en el navegador. Haz clic para conectar con tu base de datos en Vercel.";
             }
         },
 
@@ -239,11 +319,13 @@
         },
 
         async post(endpoint, payload) {
-            const isStaticHost = window.location.hostname.includes("github.io") || window.location.protocol === "file:";
+            const apiBase = this.getApiBase();
+            const isStaticHost = (typeof window !== "undefined" && (window.location.hostname.includes("github.io") || window.location.protocol === "file:")) && !apiBase;
 
             if (!isStaticHost && this.isServerAvailable !== false) {
                 try {
-                    const resp = await fetch(endpoint, {
+                    const fullUrl = apiBase ? `${apiBase}${endpoint}` : endpoint;
+                    const resp = await fetch(fullUrl, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(payload || {})
@@ -272,7 +354,7 @@
 
                     return { ok: false, error: data.error || `Error ${resp.status} del servidor`, status: resp.status };
                 } catch (netErr) {
-                    console.warn(`Servidor Django no accesible para ${endpoint}. Activando persistencia local (offline):`, netErr);
+                    console.warn(`Servidor no accesible para ${endpoint}. Activando persistencia local:`, netErr);
                     this.isServerAvailable = false;
                     const localRes = this.applyLocalMutation(endpoint, payload, true);
                     this.updateConnectionStatusBadge(false);
@@ -280,7 +362,7 @@
                 }
             }
 
-            // Modo offline / GitHub Pages
+            // Modo offline / GitHub Pages autónomo
             const localRes = this.applyLocalMutation(endpoint, payload, true);
             this.updateConnectionStatusBadge(false);
             return localRes;
@@ -797,26 +879,14 @@
                 if (action.type === "move_station") {
                     const st = NetworkStore.stationsById.get(action.stationId);
                     if (st) {
-                        await fetch(`/api/stations/${action.stationId}/update/`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ x: action.oldX, y: action.oldY })
-                        });
+                        await ApiClient.post(`/api/stations/${action.stationId}/update/`, { x: action.oldX, y: action.oldY });
                         st.x = action.oldX;
                         st.y = action.oldY;
                     }
                 } else if (action.type === "waypoints") {
-                    await fetch(`/api/line-segments/${action.lsId}/waypoints/`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ waypoints: action.oldWaypoints })
-                    });
+                    await ApiClient.post(`/api/line-segments/${action.lsId}/waypoints/`, { waypoints: action.oldWaypoints });
                 } else if (action.type === "route") {
-                    await fetch(`/api/lines/${action.lineCode}/route/`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ stops: action.oldStops })
-                    });
+                    await ApiClient.post(`/api/lines/${action.lineCode}/route/`, { stops: action.oldStops });
                 }
                 this.redoStack.push(action);
                 await refreshNetworkDataAndRender();
@@ -836,26 +906,14 @@
                 if (action.type === "move_station") {
                     const st = NetworkStore.stationsById.get(action.stationId);
                     if (st) {
-                        await fetch(`/api/stations/${action.stationId}/update/`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ x: action.newX, y: action.newY })
-                        });
+                        await ApiClient.post(`/api/stations/${action.stationId}/update/`, { x: action.newX, y: action.newY });
                         st.x = action.newX;
                         st.y = action.newY;
                     }
                 } else if (action.type === "waypoints") {
-                    await fetch(`/api/line-segments/${action.lsId}/waypoints/`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ waypoints: action.newWaypoints })
-                    });
+                    await ApiClient.post(`/api/line-segments/${action.lsId}/waypoints/`, { waypoints: action.newWaypoints });
                 } else if (action.type === "route") {
-                    await fetch(`/api/lines/${action.lineCode}/route/`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ stops: action.newStops })
-                    });
+                    await ApiClient.post(`/api/lines/${action.lineCode}/route/`, { stops: action.newStops });
                 }
                 this.undoStack.push(action);
                 await refreshNetworkDataAndRender();
@@ -3146,11 +3204,7 @@
                         if (zone) {
                             this.renderCityOutlines();
                             this.renderEditHandles();
-                            await fetch(`/api/city-outlines/${zone.id}/update/`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ polygon_points: zone.polygon_points })
-                            });
+                            await ApiClient.post(`/api/city-outlines/${zone.id}/update/`, { polygon_points: zone.polygon_points });
                             showToast(`Polígono urbano "${zone.name}" actualizado`);
                         }
                     }
@@ -4249,18 +4303,13 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
 
         async straightenLineTracks(lineCode) {
             try {
-                const resp = await fetch(`/api/lines/${lineCode}/route/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        clear_all_waypoints: true,
-                        straighten_tracks: true,
-                        straighten_orthogonal: true
-                    })
+                const res = await ApiClient.post(`/api/lines/${lineCode}/route/`, {
+                    clear_all_waypoints: true,
+                    straighten_tracks: true,
+                    straighten_orthogonal: true
                 });
-                const data = await resp.json();
-                if (!resp.ok) {
-                    showToast(data.error || "No se pudo enderezar los trazos");
+                if (!res.ok) {
+                    showToast(res.error || "No se pudo enderezar los trazos");
                     return;
                 }
                 showToast(`✓ Trazos de Línea ${lineCode} enderezados a 90° / 180°`);
@@ -4631,7 +4680,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                 const toggleAlertBtn = e.target.closest(".js-toggle-alert");
                 if (toggleAlertBtn) {
                     const alertId = toggleAlertBtn.dataset.alertId;
-                    await fetch(`/api/alerts/${alertId}/toggle/`, { method: "POST" });
+                    await ApiClient.post(`/api/alerts/${alertId}/toggle/`, {});
                     await refreshNetworkDataAndRender();
                     showToast("Estado de alerta actualizado en PCCO");
                     return;
@@ -4655,11 +4704,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         if (Number(document.getElementById("editStationSelect")?.value) === st.id) {
                             this.loadStationIntoEditor(st.id);
                         }
-                        await fetch(`/api/stations/${st.id}/update/`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ icon_tags: st.icon_tags })
-                        });
+                        await ApiClient.post(`/api/stations/${st.id}/update/`, { icon_tags: st.icon_tags });
                         const tagDef = STATION_ICON_TAGS_MAP.get(tagId);
                         showToast(`${idx < 0 ? "Agregado" : "Quitado"} tag "${tagDef?.label || tagId}" en ${st.name}`);
                     }
@@ -4688,11 +4733,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         else list.push(code);
                         st.terminal_lines = list;
                         st.is_terminal = list.length > 0;
-                        await fetch(`/api/stations/${st.id}/update/`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ terminal_lines: st.terminal_lines })
-                        });
+                        await ApiClient.post(`/api/stations/${st.id}/update/`, { terminal_lines: st.terminal_lines });
                         SchematicMapEngine.renderTracksAndStations();
                         if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                         this.selectStation(st.id);
@@ -4720,11 +4761,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         if (!list.includes(code)) list.push(code);
                         st.terminal_lines = list;
                         st.is_terminal = true;
-                        await fetch(`/api/stations/${st.id}/update/`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ terminal_lines: st.terminal_lines })
-                        });
+                        await ApiClient.post(`/api/stations/${st.id}/update/`, { terminal_lines: st.terminal_lines });
                         SchematicMapEngine.renderTracksAndStations();
                         if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                         this.selectStation(st.id);
@@ -4787,10 +4824,9 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
 
             // Simular Incidente Realista con 1 clic
             document.getElementById("btnSimulateIncident")?.addEventListener("click", async () => {
-                const resp = await fetch("/api/alerts/simulate/", { method: "POST" });
-                const data = await resp.json();
+                const res = await ApiClient.post("/api/alerts/simulate/", {});
                 await refreshNetworkDataAndRender();
-                showToast(`Incidente simulado: ${data.title}`);
+                showToast(`Incidente simulado: ${res.data?.title || "Alerta emitida"}`);
             });
 
             // Modal Nueva Alerta
@@ -4815,11 +4851,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                     speed_factor: parseFloat(document.getElementById("newAlertSpeedFactor").value),
                     description: document.getElementById("newAlertDesc").value
                 };
-                await fetch("/api/alerts/create/", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
+                await ApiClient.post("/api/alerts/create/", payload);
                 modalAlert?.classList.add("hidden");
                 await refreshNetworkDataAndRender();
                 showToast("Nueva alerta emitida por el Puesto Central de Control");
@@ -4955,11 +4987,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                         if (!stopItem.is_terminal_for_line && pos >= 0) list.splice(pos, 1);
                         st.terminal_lines = list;
                         st.is_terminal = list.length > 0;
-                        await fetch(`/api/stations/${st.id}/update/`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ terminal_lines: st.terminal_lines })
-                        });
+                        await ApiClient.post(`/api/stations/${st.id}/update/`, { terminal_lines: st.terminal_lines });
                         SchematicMapEngine.renderTracksAndStations();
                         if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                         showToast(`${stopItem.is_terminal_for_line ? "Marcada" : "Quitada"} ${st.name} como terminal de Línea ${code}`);
@@ -5087,7 +5115,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
 
             // Botón Restaurar Plan Maestro original
             document.getElementById("btnResetMasterPlan")?.addEventListener("click", async () => {
-                await fetch("/api/network/reset/", { method: "POST" });
+                await ApiClient.post("/api/network/reset/", {});
                 await refreshNetworkDataAndRender(true);
                 showToast("Cartografía y datos restaurados al Plan Maestro SMyT original");
             });
@@ -5717,6 +5745,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
             SchematicMapEngine.init();
             SchematicMapEngine.renderAll();
             ControlCenterUI.init();
+            ApiClient.initBadgeClickHandler();
             requestAnimationFrame((t) => TrainSimulationEngine.step(t));
         } catch (err) {
             console.error("Error inicializando SMyT:", err);

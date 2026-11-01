@@ -1,5 +1,5 @@
 """
-Pruebas de Integración para Persistencia en Localhost, Capa de Edición y Reset de Red.
+Pruebas de Integración para Persistencia en Servidor y Almacenamiento Local, Capa de Edición y Reset de Red.
 Verifica:
 - POST /api/editor/save/
 - GET /api/editor/status/

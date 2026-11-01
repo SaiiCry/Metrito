@@ -1,7 +1,7 @@
 """
 Generador de sitio estático empaquetado para GitHub Pages (SIMMA / Metrito).
-Exporta el HTML compilado, los datos de red JSON serializados (/api/network/) y todos los activos estáticos a docs/
-para que la página funcione 100% de forma autónoma alojada en GitHub Pages.
+Exporta el HTML compilado, los datos de red JSON serializados (/api/network/) y todos los activos estáticos tanto a docs/
+como a la raíz del repositorio, garantizando compatibilidad total con cualquier configuración de GitHub Pages (Root, Docs o GitHub Actions).
 """
 
 import os
@@ -62,19 +62,35 @@ def build_github_pages_bundle():
     src_template = BASE_DIR / "network" / "templates" / "network" / "index.html"
     raw_html = src_template.read_text(encoding="utf-8")
 
-    # Limpiar template tags de Django
+    # Limpiar template tags de Django y sustituir rutas de API cartográficas por rutas estáticas relativas
     clean_html = raw_html.replace("{% load static %}", "")
     clean_html = clean_html.replace("{% static 'network/css/styles.css' %}", "static/network/css/styles.css")
     clean_html = clean_html.replace("{% static 'network/js/app.js' %}", "static/network/js/app.js")
     clean_html = clean_html.replace('src="/api/cartografia/logo/"', 'src="cartografia/logo_metro.svg"')
+    clean_html = clean_html.replace('href="/api/cartografia/svg/"', 'href="cartografia/red_metro.svg"')
 
     (DOCS_DIR / "index.html").write_text(clean_html, encoding="utf-8")
     print(" -> docs/index.html generado exitosamente")
 
-    # 5. Crear archivo .nojekyll para evitar que GitHub Pages ignore carpetas estáticas
+    # 5. Crear archivo .nojekyll en docs/
     (DOCS_DIR / ".nojekyll").write_text("", encoding="utf-8")
 
-    print("¡Empaquetado completado! El directorio docs/ está listo para desplegar en GitHub Pages.")
+    # 6. Sincronizar en la raíz del repositorio para despliegues desde / (root) en GitHub Pages
+    root_data_dir = BASE_DIR / "data"
+    root_data_dir.mkdir(parents=True, exist_ok=True)
+    (root_data_dir / "network.json").write_text(network_data_json, encoding="utf-8")
+
+    root_static_dest = BASE_DIR / "static" / "network"
+    root_static_dest.mkdir(parents=True, exist_ok=True)
+    if src_static.exists():
+        shutil.copytree(src_static / "css", root_static_dest / "css", dirs_exist_ok=True)
+        shutil.copytree(src_static / "js", root_static_dest / "js", dirs_exist_ok=True)
+
+    (BASE_DIR / "index.html").write_text(clean_html, encoding="utf-8")
+    (BASE_DIR / ".nojekyll").write_text("", encoding="utf-8")
+    print(" -> Raíz sincronizada exitosamente (index.html, .nojekyll, data/, static/)")
+
+    print("¡Empaquetado completado! Listo para desplegar en GitHub Pages y Vercel.")
 
 if __name__ == "__main__":
     build_github_pages_bundle()

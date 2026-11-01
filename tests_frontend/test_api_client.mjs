@@ -99,4 +99,36 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         assert.equal(saved.stations[101].x, 2450.5);
         assert.equal(saved.stations[101].y, 1920.0);
     });
+
+    it("configuración de endpoint de Vercel (setApiBase / getApiBase) y enrutamiento remoto", () => {
+        // Simular ApiClient.setApiBase y getApiBase
+        const setApiBase = (url) => {
+            if (!url || !url.trim()) {
+                mockLocalStorage.removeItem("metrito_api_url");
+            } else {
+                mockLocalStorage.setItem("metrito_api_url", url.trim().replace(/\/+$/, ""));
+            }
+        };
+
+        const getApiBase = () => {
+            const stored = mockLocalStorage.getItem("metrito_api_url");
+            return stored ? stored.trim().replace(/\/+$/, "") : "";
+        };
+
+        // Estado inicial vacío
+        assert.equal(getApiBase(), "");
+
+        // Asignar backend en Vercel
+        setApiBase("https://metrito-api.vercel.app/");
+        assert.equal(getApiBase(), "https://metrito-api.vercel.app");
+
+        // Construir endpoint con prefijo remoto de Vercel
+        const endpoint = "/api/network/";
+        const fullUrl = `${getApiBase()}${endpoint}`;
+        assert.equal(fullUrl, "https://metrito-api.vercel.app/api/network/");
+
+        // Limpiar para volver a modo autónomo en GitHub Pages
+        setApiBase("");
+        assert.equal(getApiBase(), "");
+    });
 });

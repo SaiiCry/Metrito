@@ -21,31 +21,27 @@ Aplicación web de visualización geoespacial, cartografía editable y Puesto Ce
 
 ---
 
-## Ejecución Rápida
+## Despliegue y Acceso en Línea
 
-El proyecto ya incluye el entorno virtual `.venv` configurado y la base de datos `db.sqlite3` migrada y poblada con las 34 líneas y todas sus estaciones, lista para ejecutarse de inmediato:
+El proyecto está diseñado y configurado para operar en la nube sin depender de servidores localhost:
+
+- **Aplicación Web y PCCO (GitHub Pages)**: [https://saiicry.github.io/Metrito/](https://saiicry.github.io/Metrito/)
+- **Backend API y Base de Datos (Vercel + PostgreSQL / Neon)**: Configurado mediante `vercel.json` y `metrito_config/wsgi.py` para alojar los endpoints `/api/*` y conectarse a bases de datos PostgreSQL en la nube (`DATABASE_URL` / `POSTGRES_URL`).
+
+### Empaquetado y Actualización de GitHub Pages
+
+Para regenerar los activos estáticos compilados tanto en la raíz como en el directorio `docs/`:
 
 ```powershell
-# 1. Activar el entorno virtual (o usar directamente .\.venv\Scripts\python.exe)
-.\.venv\Scripts\Activate.ps1
-
-# 2. (Opcional) Instalar dependencias si se crea un entorno nuevo
-pip install -r requirements.txt
-
-# 3. Aplicar migraciones de base de datos
-.\.venv\Scripts\python.exe manage.py migrate
-
-# 4. (Opcional) Inicializar o restaurar la topología maestra de metro2.pdf y metro2.png
-.\.venv\Scripts\python.exe manage.py seed_network --reset
-
-# 5. Arrancar el servidor de desarrollo
-.\.venv\Scripts\python.exe manage.py runserver 8000
+.\.venv\Scripts\python.exe export_static_site.py
 ```
 
-Una vez iniciado el servidor, abre en el navegador:
-- **Aplicación Principal y PCCO**: http://127.0.0.1:8000/
-- **API JSON de la Red**: http://127.0.0.1:8000/api/network/
-- **Panel de Administración Django**: http://127.0.0.1:8000/admin/
+El script genera automáticamente:
+- `index.html` (interfaz compilada con rutas relativas autónomas)
+- `data/network.json` (topología serializada con las 34 líneas y 828 estaciones)
+- `cartografia/` (archivos vectoriales oficiales SVG y esquemas JSON)
+- `static/network/` (estilos CSS y lógica JavaScript)
+- `.nojekyll` (instrucción para GitHub Pages que garantiza la entrega directa de activos)
 
 ---
 
@@ -75,7 +71,7 @@ El sistema cuenta con un **Editor Visual de Red** integrado directamente sobre e
 5. **Persistencia Desacoplada de Ediciones**:
    - Los datos base del proyecto provienen de `cartografia/red_metro.json` (solo lectura).
    - Todas las creaciones y modificaciones de usuario se persisten en la tabla `UserNetworkEditLayer` (SQLite) y se exportan automáticamente a `cartografia/user_network_edits.json`.
-   - **Protección contra Pérdida de Datos en Reinicios**: La función `seed_database(force_reset=False)` detecta la existencia de líneas y omite cualquier sobreescritura, garantizando que recargas del navegador, reinicios del proceso `runserver` o actualizaciones del código base conserven intactas las estaciones y líneas de usuario.
+   - **Protección contra Pérdida de Datos en Reinicios**: La función `seed_database(force_reset=False)` detecta la existencia de líneas y omite cualquier sobreescritura, garantizando que recargas del navegador, reinicios de contenedores o actualizaciones del código base conserven intactas las estaciones y líneas de usuario.
 
 ---
 

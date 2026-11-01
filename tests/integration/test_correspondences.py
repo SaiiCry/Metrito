@@ -266,3 +266,76 @@ class TestCorrespondencesEndpoint:
         # Solo pertenece a Línea 1 nuevamente, por lo que no es de transferencia
         assert st_alfa.is_transfer is False
         assert not LineStation.objects.filter(line=line_2, station=st_alfa).exists()
+
+    def test_create_multiple_correspondences_at_once_success(self, api_client, minimal_network, line_factory):
+        """
+        Permite vincular más de una correspondencia simultáneamente mediante target_line_codes.
+        Verifica que se creen los LineStation en cada línea, se marque is_transfer y se sincronice correspondences_text.
+        """
+        st_alfa = minimal_network["st_alfa"]  # Ya en Línea 1
+        l3 = line_factory(code="3", name="Línea 3", color="#10B981")
+        l4 = line_factory(code="4", name="Línea 4", color="#F59E0B")
+        l5 = line_factory(code="5", name="Línea 5", color="#8B5CF6")
+
+        payload = {
+            "station_id": st_alfa.id,
+            "target_line_codes": ["3", "4", "5"],
+        }
+        resp = api_client.post(
+            "/api/correspondences/create/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["is_transfer"] is True
+        assert set(data["added_lines"]) == {"3", "4", "5"}
+        assert set(data["served_lines"]) == {"1", "3", "4", "5"}
+        assert data["total_lines_count"] == 4
+
+        st_alfa.refresh_from_db()
+        assert st_alfa.is_transfer is True
+        for code in ["1", "3", "4", "5"]:
+            assert LineStation.objects.filter(station=st_alfa, line__code=code).exists()
+
+    def test_enforce_maximum_10_correspondences_per_station(self, api_client, minimal_network, line_factory):
+        """
+        Regla de negocio: Una estación puede tener un máximo de 10 correspondencias/líneas.
+        - Se permite conectar hasta 10 líneas.
+        - Intentar agregar una 11va línea es rechazado con status 400 y mensaje descriptivo.
+        """
+        st_alfa = minimal_network["st_alfa"]  # Ya en Línea 1 (1 línea)
+        line_2 = minimal_network["line_2"]    # Línea 2 ya existe (código '2')
+
+        # Crear 8 líneas adicionales para llegar a 10 (Línea 2 + L3..L10)
+        line_codes = [line_2.code]
+        for i in range(3, 11):
+            code = str(i)
+            line_factory(code=code, name=f"Línea {code}")
+            line_codes.append(code)
+
+        # Conectar las 9 líneas adicionales en batch -> Total 10 líneas
+        resp_batch = api_client.post(
+            "/api/correspondences/create/",
+            data=json.dumps({"station_id": st_alfa.id, "target_line_codes": line_codes}),
+            content_type="application/json",
+        )
+        assert resp_batch.status_code == 200
+        data_batch = resp_batch.json()
+        assert data_batch["total_lines_count"] == 10
+        assert len(data_batch["served_lines"]) == 10
+
+        # Crear la 11va línea (L11)
+        line_factory(code="11", name="Línea 11")
+
+        # Intentar conectar la 11va línea debe ser rechazado
+        resp_overflow = api_client.post(
+            "/api/correspondences/create/",
+            data=json.dumps({"station_id": st_alfa.id, "target_line_code": "11"}),
+            content_type="application/json",
+        )
+        assert resp_overflow.status_code == 400
+        err_msg = resp_overflow.json()["error"]
+        assert "Límite alcanzado" in err_msg or "máximo permitido de 10 correspondencias" in err_msg
+        assert not LineStation.objects.filter(station=st_alfa, line__code="11").exists()

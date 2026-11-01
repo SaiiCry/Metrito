@@ -65,6 +65,12 @@ function createNetworkStore() {
 
         // Helper para formular payloads de correspondencia directamente por IDs numéricos (sin selector UI)
         createCorrespondencePayload(stationId, targetLineOrStation2) {
+            if (Array.isArray(targetLineOrStation2)) {
+                return {
+                    station_id: stationId,
+                    target_line_codes: targetLineOrStation2.map(c => String(c).trim().toUpperCase()),
+                };
+            }
             if (typeof targetLineOrStation2 === "string") {
                 return {
                     station_id: stationId,
@@ -229,6 +235,13 @@ describe("Requisito UI / Integridad de Nombres e Inmunidad al Modal Selector", (
         assert.deepEqual(payloadLinea, {
             station_id: 101,
             target_line_code: "2",
+        });
+
+        // Correspondencia múltiple (más de una línea simultánea)
+        const payloadMultiples = store.createCorrespondencePayload(101, ["2", "3", "7"]);
+        assert.deepEqual(payloadMultiples, {
+            station_id: 101,
+            target_line_codes: ["2", "3", "7"],
         });
 
         // Verificación de que ningún nombre fue alterado al formular las correspondencias

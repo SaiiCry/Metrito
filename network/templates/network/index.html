@@ -733,15 +733,27 @@
                         <div class="form-group">
                             <label for="corrStationSelect">Estación a Conectar como Correspondencia</label>
                             <select id="corrStationSelect" class="form-control" required></select>
-                            <p class="form-hint">Elige la estación de la lista o haz clic directamente sobre ella en el plano.</p>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                                <span class="form-hint" id="corrStationCurrentLinesText">Líneas actuales: -</span>
+                                <span id="corrCapacityBadge" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; background:#e2e8f0; color:#334155;">0/10 líneas</span>
+                            </div>
                         </div>
                         <div class="form-group">
-                            <label for="corrTargetLineSelect">Línea Destino de la Correspondencia</label>
-                            <select id="corrTargetLineSelect" class="form-control" required></select>
-                            <p class="form-hint">No se permite conectar una estación con una línea a la que ya pertenezca.</p>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <label>Líneas Destino (selecciona una o más · máx. 10)</label>
+                                <div style="font-size:11px; display:flex; gap:8px;">
+                                    <button type="button" class="btn-link" id="btnSelectAllSidebarLines" style="background:none; border:none; color:var(--primary, #0052ff); cursor:pointer; padding:0; text-decoration:underline;">Todas</button>
+                                    <button type="button" class="btn-link" id="btnClearSidebarLines" style="background:none; border:none; color:#64748b; cursor:pointer; padding:0; text-decoration:underline;">Limpiar</button>
+                                </div>
+                            </div>
+                            <div id="corrTargetLinesChecklist" class="corr-lines-checklist" style="max-height:160px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:6px; padding:6px; background:#f8fafc; display:flex; flex-direction:column; gap:4px;">
+                                <!-- Casillas de líneas disponibles -->
+                            </div>
+                            <select id="corrTargetLineSelect" class="form-control hidden" multiple></select>
+                            <p class="form-hint" id="corrSelectionHint">Puedes marcar varias líneas para vincular múltiples correspondencias al mismo tiempo.</p>
                         </div>
                         <button type="submit" class="btn-primary btn-block" id="btnSubmitAddCorrespondence">
-                            ⇄ Conectar como Transbordo
+                            ⇄ Conectar Correspondencias Seleccionadas
                         </button>
                     </form>
                     <div class="route-editor-box" style="margin-top:14px;">
@@ -965,16 +977,28 @@
                 <div class="form-group">
                     <label for="modalCorrStationSelect">Estación de Transferencia (Origen)</label>
                     <select id="modalCorrStationSelect" class="form-control" required></select>
-                    <p class="form-hint" id="modalCorrStationLinesText">Líneas actuales: -</p>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                        <span class="form-hint" id="modalCorrStationLinesText">Líneas actuales: -</span>
+                        <span id="modalCorrCapacityBadge" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; background:#e2e8f0; color:#334155;">0/10 líneas</span>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="modalCorrLineSelect">Línea a Conectar</label>
-                    <select id="modalCorrLineSelect" class="form-control" required></select>
-                    <p class="form-hint">No se permite conectar una estación a la misma línea que ya la opera (se rechazará como intra-línea).</p>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label>Líneas a Conectar (selecciona una o más · máx. 10)</label>
+                        <div style="font-size:11px; display:flex; gap:8px;">
+                            <button type="button" class="btn-link" id="btnSelectAllModalLines" style="background:none; border:none; color:var(--primary, #0052ff); cursor:pointer; padding:0; text-decoration:underline;">Todas</button>
+                            <button type="button" class="btn-link" id="btnClearModalLines" style="background:none; border:none; color:#64748b; cursor:pointer; padding:0; text-decoration:underline;">Limpiar</button>
+                        </div>
+                    </div>
+                    <div id="modalCorrLinesChecklist" class="corr-lines-checklist" style="max-height:160px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:6px; padding:6px; background:#f8fafc; display:flex; flex-direction:column; gap:4px;">
+                        <!-- Opciones con casillas dinámicas -->
+                    </div>
+                    <select id="modalCorrLineSelect" class="form-control hidden" multiple></select>
+                    <p class="form-hint" id="modalCorrSelectionHint">Puedes marcar más de una línea para agregar múltiples correspondencias a la vez (máximo 10 por estación).</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-secondary" id="btnCancelNewCorrModal">Cancelar</button>
-                    <button type="submit" class="btn-primary">Establecer Correspondencia</button>
+                    <button type="submit" class="btn-primary" id="btnSubmitModalCorr">Establecer Correspondencia(s)</button>
                 </div>
             </form>
         </div>

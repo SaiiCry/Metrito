@@ -1476,45 +1476,102 @@ def api_create_correspondence(request):
         except Exception as exc:
             return JsonResponse({"error": f"Error al desconectar correspondencia: {str(exc)}"}, status=500)
 
-    if raw_s1 and raw_line:
+    MAX_CORRESPONDENCES_PER_STATION = 10
+
+    raw_lines_input = (
+        payload.get("target_line_codes")
+        or payload.get("target_lines")
+        or payload.get("lines")
+        or payload.get("target_line_code")
+        or payload.get("line_code")
+        or payload.get("target_line")
+    )
+
+    if raw_s1 and raw_lines_input:
         st = find_station(raw_s1)
         if not st:
             return JsonResponse({"error": "La estación no existe."}, status=400)
 
-        target_line = find_line(raw_line)
-        if not target_line:
-            return JsonResponse({"error": f"La línea '{raw_line}' no existe."}, status=400)
+        if isinstance(raw_lines_input, list):
+            lines_list = raw_lines_input
+        elif isinstance(raw_lines_input, str) and "," in raw_lines_input:
+            lines_list = [c.strip() for c in raw_lines_input.split(",") if c.strip()]
+        else:
+            lines_list = [raw_lines_input]
 
-        # Validación intra-línea estricta: ¿La estación ya pertenece a target_line?
-        if LineStation.objects.filter(line=target_line, station=st).exists():
+        seen_codes = set()
+        clean_lines = []
+        for x in lines_list:
+            if x is not None:
+                val = str(x).strip()
+                if val and val not in seen_codes:
+                    seen_codes.add(val)
+                    clean_lines.append(val)
+
+        if not clean_lines:
+            return JsonResponse({"error": "Debes especificar al menos una línea válida para la correspondencia."}, status=400)
+
+        current_line_ids = set(LineStation.objects.filter(station=st).values_list("line_id", flat=True))
+        current_count = len(current_line_ids)
+
+        if current_count >= MAX_CORRESPONDENCES_PER_STATION:
             return JsonResponse({
-                "error": f"No se puede crear correspondencia entre la misma línea: '{st.name}' ya forma parte de la Línea {target_line.code}."
+                "error": f"Límite alcanzado: La estación '{st.name}' ya cuenta con el máximo permitido de {MAX_CORRESPONDENCES_PER_STATION} correspondencias/líneas operativas."
             }, status=400)
 
-        last_seq = LineStation.objects.filter(line=target_line, branch="main").order_by("-sequence").values_list("sequence", flat=True).first()
-        seq = (last_seq + 1) if last_seq is not None else 0
+        valid_target_lines = []
+        already_operating_codes = []
+        for l_item in clean_lines:
+            target_line = find_line(l_item)
+            if not target_line:
+                return JsonResponse({"error": f"La línea '{l_item}' no existe."}, status=400)
+            if target_line.id in current_line_ids or target_line in valid_target_lines:
+                already_operating_codes.append(target_line.code)
+            else:
+                valid_target_lines.append(target_line)
+
+        if not valid_target_lines:
+            if len(already_operating_codes) == 1:
+                return JsonResponse({
+                    "error": f"No se puede crear correspondencia entre la misma línea: '{st.name}' ya forma parte de la Línea {already_operating_codes[0]}."
+                }, status=400)
+            else:
+                return JsonResponse({
+                    "error": f"No se puede crear correspondencia: '{st.name}' ya forma parte de las líneas seleccionadas ({', '.join(already_operating_codes)})."
+                }, status=400)
+
+        if current_count + len(valid_target_lines) > MAX_CORRESPONDENCES_PER_STATION:
+            disponibles = MAX_CORRESPONDENCES_PER_STATION - current_count
+            return JsonResponse({
+                "error": f"Límite excedido: una estación puede tener como máximo {MAX_CORRESPONDENCES_PER_STATION} correspondencias. '{st.name}' cuenta con {current_count} líneas activas y solo puede agregar hasta {disponibles} más (intentando agregar {len(valid_target_lines)})."
+            }, status=400)
 
         with transaction.atomic():
-            LineStation.objects.create(
-                line=target_line,
-                station=st,
-                sequence=seq,
-                branch="main",
-                segment_infrastructure=st.infrastructure_type,
-                segment_status=st.operational_status,
-                depth_meters=st.depth_meters,
-                chainage_km=0.0,
-                waypoints=[],
-                correspondences_text="",
-            )
+            for target_line in valid_target_lines:
+                last_seq = LineStation.objects.filter(line=target_line, branch="main").order_by("-sequence").values_list("sequence", flat=True).first()
+                seq = (last_seq + 1) if last_seq is not None else 0
+
+                LineStation.objects.create(
+                    line=target_line,
+                    station=st,
+                    sequence=seq,
+                    branch="main",
+                    segment_infrastructure=st.infrastructure_type,
+                    segment_status=st.operational_status,
+                    depth_meters=st.depth_meters,
+                    chainage_km=0.0,
+                    waypoints=[],
+                    correspondences_text="",
+                )
+
+                target_line.declared_stations_count = LineStation.objects.filter(line=target_line).count()
+                target_line.operational_stations_count = LineStation.objects.filter(line=target_line, segment_status="operational").count()
+                target_line.is_custom_modified = True
+                target_line.save(update_fields=["declared_stations_count", "operational_stations_count", "is_custom_modified"])
+
             st.is_transfer = True
             st.is_custom_modified = True
             st.save(update_fields=["is_transfer", "is_custom_modified"])
-
-            target_line.declared_stations_count = LineStation.objects.filter(line=target_line).count()
-            target_line.operational_stations_count = LineStation.objects.filter(line=target_line, segment_status="operational").count()
-            target_line.is_custom_modified = True
-            target_line.save(update_fields=["declared_stations_count", "operational_stations_count", "is_custom_modified"])
 
             served_codes = list(LineStation.objects.filter(station=st).values_list("line__code", flat=True).distinct())
             corr_text = "/".join(sorted(served_codes))
@@ -1526,7 +1583,10 @@ def api_create_correspondence(request):
             "station_id": st.id,
             "station_name": st.name,
             "is_transfer": True,
+            "line_code": valid_target_lines[0].code if len(valid_target_lines) == 1 else None,
+            "added_lines": [l.code for l in valid_target_lines],
             "served_lines": sorted(served_codes),
+            "total_lines_count": len(served_codes),
         })
 
     elif raw_s1 and raw_s2:
@@ -1544,6 +1604,12 @@ def api_create_correspondence(request):
         if lines_st1 and lines_st1 == lines_st2 and len(lines_st1) == 1:
             return JsonResponse({
                 "error": "No se puede crear correspondencia entre la misma línea: ambas estaciones pertenecen únicamente a la misma línea."
+            }, status=400)
+
+        all_lines = sorted(list(lines_st1.union(lines_st2)))
+        if len(all_lines) > MAX_CORRESPONDENCES_PER_STATION:
+            return JsonResponse({
+                "error": f"Límite excedido: La unión de correspondencias generaría {len(all_lines)} líneas (el máximo permitido por estación es {MAX_CORRESPONDENCES_PER_STATION})."
             }, status=400)
 
         with transaction.atomic():

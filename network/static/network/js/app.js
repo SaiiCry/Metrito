@@ -81,6 +81,12 @@
         },
 
         createCorrespondencePayload(stationId, targetLineOrStation2) {
+            if (Array.isArray(targetLineOrStation2)) {
+                return {
+                    station_id: stationId,
+                    target_line_codes: targetLineOrStation2.map(c => String(c).trim().toUpperCase()),
+                };
+            }
             if (typeof targetLineOrStation2 === "string") {
                 return {
                     station_id: stationId,
@@ -204,6 +210,68 @@
             }
         }
     };
+
+    function renderCorrespondenceLinesChecklist(checklistEl, selectEl, availableLines, remainingQuota) {
+        if (!checklistEl) return;
+        if (availableLines.length === 0) {
+            checklistEl.innerHTML = `<div style="font-size:11.5px; color:#64748b; font-style:italic; padding:6px;">La estación ya pertenece a todas las líneas del sistema.</div>`;
+            if (selectEl) {
+                selectEl.innerHTML = "";
+                selectEl.disabled = true;
+            }
+            return;
+        }
+
+        if (remainingQuota <= 0) {
+            checklistEl.innerHTML = `<div style="font-size:11.5px; color:#b91c1c; font-weight:600; padding:6px; background:#fef2f2; border-radius:4px;">⚠️ Límite alcanzado: Esta estación ya tiene el máximo permitido de 10 correspondencias. Desconecta alguna línea si deseas asociar otra.</div>`;
+            if (selectEl) {
+                selectEl.innerHTML = "";
+                selectEl.disabled = true;
+            }
+            return;
+        }
+
+        if (selectEl) {
+            selectEl.disabled = false;
+            selectEl.innerHTML = availableLines.map(l =>
+                `<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
+            ).join("");
+        }
+
+        checklistEl.innerHTML = availableLines.map(l => {
+            const bg = l.color || "#0052ff";
+            const fg = typeof getBadgeTextColor === "function" ? getBadgeTextColor(bg, "#FFFFFF") : "#FFFFFF";
+            return `
+                <label class="corr-line-checkbox-item" style="display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:4px; cursor:pointer; font-size:12px; user-select:none;">
+                    <input type="checkbox" class="js-corr-line-checkbox" value="${escapeHtml(l.code)}" style="cursor:pointer; accent-color:var(--primary, #0052ff);">
+                    <span style="background:${bg}; color:${fg}; font-weight:700; font-size:10px; padding:1px 6px; border-radius:3px; min-width:22px; text-align:center;">
+                        ${escapeHtml(l.code)}
+                    </span>
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1e293b; font-weight:500;">
+                        ${escapeHtml(l.name)}
+                    </span>
+                </label>
+            `;
+        }).join("");
+
+        const checkboxes = checklistEl.querySelectorAll(".js-corr-line-checkbox");
+        checkboxes.forEach(cb => {
+            cb.addEventListener("change", (e) => {
+                const checked = Array.from(checkboxes).filter(c => c.checked);
+                if (checked.length > remainingQuota) {
+                    e.target.checked = false;
+                    showToast(`Máximo 10 correspondencias por estación (solo puedes seleccionar hasta ${remainingQuota} en esta estación).`);
+                    return;
+                }
+                if (selectEl) {
+                    const checkedValues = new Set(Array.from(checkboxes).filter(c => c.checked).map(c => c.value));
+                    Array.from(selectEl.options).forEach(opt => {
+                        opt.selected = checkedValues.has(opt.value);
+                    });
+                }
+            });
+        });
+    }
 
     // =========================================================================
     // 1C. CONTROLADOR DE HERRAMIENTAS ACTIVAS DEL EDITOR VISUAL
@@ -355,7 +423,10 @@
             if (!modal) return;
             const inputStation = document.getElementById("modalCorrStationSelect");
             const linesText = document.getElementById("modalCorrStationLinesText");
+            const capacityBadge = document.getElementById("modalCorrCapacityBadge");
+            const checklist = document.getElementById("modalCorrLinesChecklist");
             const selLine = document.getElementById("modalCorrLineSelect");
+            const submitBtn = document.getElementById("btnSubmitModalCorr");
 
             const sorted = NetworkStore.getSortedStations();
             if (inputStation) {
@@ -371,22 +442,24 @@
             const updateModalLines = () => {
                 const curId = inputStation ? Number(inputStation.value) : Number(stationId);
                 const curSt = NetworkStore.stationsById.get(curId);
+                const served = curSt && Array.isArray(curSt.lines) ? new Set(curSt.lines) : new Set();
+                const currentCount = served.size;
+                const remainingQuota = Math.max(0, 10 - currentCount);
+
                 if (linesText && curSt) {
                     linesText.textContent = `Líneas actuales: ${curSt.lines.join(", ") || "Ninguna"}`;
                 }
-                if (selLine) {
-                    const served = curSt && Array.isArray(curSt.lines) ? new Set(curSt.lines) : new Set();
-                    const available = NetworkStore.lines.filter(l => !served.has(l.code));
-                    if (available.length === 0) {
-                        selLine.innerHTML = `<option value="">(La estación ya pertenece a todas las líneas)</option>`;
-                        selLine.disabled = true;
-                    } else {
-                        selLine.disabled = false;
-                        selLine.innerHTML = available.map(l =>
-                            `<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
-                        ).join("");
-                    }
+                if (capacityBadge) {
+                    capacityBadge.textContent = `${currentCount}/10 líneas`;
+                    capacityBadge.style.background = currentCount >= 10 ? "#fee2e2" : "#e2e8f0";
+                    capacityBadge.style.color = currentCount >= 10 ? "#b91c1c" : "#334155";
                 }
+                if (submitBtn) {
+                    submitBtn.disabled = remainingQuota <= 0;
+                }
+
+                const available = NetworkStore.lines.filter(l => !served.has(l.code));
+                renderCorrespondenceLinesChecklist(checklist, selLine, available, remainingQuota);
             };
 
             updateModalLines();
@@ -394,6 +467,46 @@
                 inputStation.dataset.boundChange = "true";
                 inputStation.addEventListener("change", updateModalLines);
             }
+
+            const btnAll = document.getElementById("btnSelectAllModalLines");
+            if (btnAll && !btnAll.dataset.bound) {
+                btnAll.dataset.bound = "true";
+                btnAll.addEventListener("click", () => {
+                    const curId = inputStation ? Number(inputStation.value) : Number(stationId);
+                    const curSt = NetworkStore.stationsById.get(curId);
+                    const count = curSt && Array.isArray(curSt.lines) ? curSt.lines.length : 0;
+                    const quota = Math.max(0, 10 - count);
+                    const cbs = checklist ? Array.from(checklist.querySelectorAll(".js-corr-line-checkbox")) : [];
+                    let checkedSoFar = 0;
+                    cbs.forEach(cb => {
+                        if (checkedSoFar < quota) {
+                            cb.checked = true;
+                            checkedSoFar++;
+                        } else {
+                            cb.checked = false;
+                        }
+                    });
+                    if (selLine) {
+                        const checkedValues = new Set(cbs.filter(c => c.checked).map(c => c.value));
+                        Array.from(selLine.options).forEach(opt => {
+                            opt.selected = checkedValues.has(opt.value);
+                        });
+                    }
+                });
+            }
+
+            const btnClear = document.getElementById("btnClearModalLines");
+            if (btnClear && !btnClear.dataset.bound) {
+                btnClear.dataset.bound = "true";
+                btnClear.addEventListener("click", () => {
+                    const cbs = checklist ? checklist.querySelectorAll(".js-corr-line-checkbox") : [];
+                    cbs.forEach(cb => { cb.checked = false; });
+                    if (selLine) {
+                        Array.from(selLine.options).forEach(opt => { opt.selected = false; });
+                    }
+                });
+            }
+
             modal.classList.remove("hidden");
         },
 
@@ -2850,9 +2963,15 @@
                             <button type="button" class="btn-secondary btn-xs js-open-station-editor" data-station-id="${st.id}">
                                 Editar Estación
                             </button>
-                            <button type="button" class="btn-secondary btn-xs js-quick-add-corr" data-station-id="${st.id}" style="color:var(--accent-blue); font-weight:600;">
-                                ⇄ Añadir a Línea
-                            </button>
+                            ${servedCodes.length >= 10 ? `
+                                <span style="font-size:10px; font-weight:700; color:#b91c1c; background:#fee2e2; padding:3px 6px; border-radius:4px;">
+                                    Máx. 10 correspondencias
+                                </span>
+                            ` : `
+                                <button type="button" class="btn-secondary btn-xs js-quick-add-corr" data-station-id="${st.id}" style="color:var(--accent-blue); font-weight:600;">
+                                    ⇄ Añadir a Línea (${servedCodes.length}/10)
+                                </button>
+                            `}
                             <button type="button" class="btn-secondary btn-xs js-delete-station-btn" data-station-id="${st.id}" style="color:#ef4444; font-weight:600;">
                                 🗑 Eliminar
                             </button>
@@ -2860,7 +2979,7 @@
                     </div>
 
                     <div>
-                        <span class="section-eyebrow">LÍNEAS ASIGNADAS Y CORRESPONDENCIAS</span>
+                        <span class="section-eyebrow">LÍNEAS ASIGNADAS Y CORRESPONDENCIAS (${servedCodes.length}/10)</span>
                         ${linesListHtml}
                     </div>
 
@@ -4464,11 +4583,13 @@
             });
 
             // 4. Envío Formulario Modal: Agregar Correspondencia
-            const submitCorrAction = async (stId, lineCode) => {
+            const submitCorrAction = async (stId, lineCodes) => {
                 try {
                     const payload = NetworkStore.createCorrespondencePayload
-                        ? NetworkStore.createCorrespondencePayload(stId, lineCode)
-                        : { station_id: stId, target_line_code: lineCode };
+                        ? NetworkStore.createCorrespondencePayload(stId, lineCodes)
+                        : (Array.isArray(lineCodes)
+                            ? { station_id: stId, target_line_codes: lineCodes }
+                            : { station_id: stId, target_line_code: lineCodes });
                     const resp = await fetch("/api/correspondences/create/", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -4483,13 +4604,17 @@
                     await refreshNetworkDataAndRender();
                     this.selectStation(stId);
                     this.populateCorrespondenceSubtab();
+                    const addedNames = resData.added_lines && resData.added_lines.length > 0
+                        ? resData.added_lines.join(", ")
+                        : (Array.isArray(lineCodes) ? lineCodes.join(", ") : lineCodes);
+                    const totalCount = resData.total_lines_count || (resData.served_lines ? resData.served_lines.length : "?");
                     HistoryManager.push({
                         type: "correspondence_create",
                         stationId: stId,
-                        lineCode,
-                        description: `Correspondencia Línea ${lineCode} en ${resData.station_name}`
+                        lineCodes: Array.isArray(lineCodes) ? lineCodes : [lineCodes],
+                        description: `Correspondencia Línea(s) ${addedNames} en ${resData.station_name}`
                     });
-                    showToast(`Correspondencia establecida con Línea ${lineCode} en ${resData.station_name}`);
+                    showToast(`✓ Correspondencia establecida con Línea(s) ${addedNames} en ${resData.station_name} (${totalCount}/10 líneas)`);
                 } catch (err) {
                     showToast("Error de conexión al crear correspondencia");
                 }
@@ -4503,12 +4628,19 @@
                     showToast("Selecciona una estación existente");
                     return;
                 }
-                const lineCode = document.getElementById("modalCorrLineSelect").value;
-                if (!lineCode) {
-                    showToast("Selecciona una línea destino válida");
+                const checkedCbs = Array.from(document.querySelectorAll("#modalCorrLinesChecklist .js-corr-line-checkbox:checked"));
+                let lineCodes = checkedCbs.map(cb => cb.value);
+                if (lineCodes.length === 0) {
+                    const sel = document.getElementById("modalCorrLineSelect");
+                    if (sel && sel.value) {
+                        lineCodes = Array.from(sel.selectedOptions).map(o => o.value).filter(Boolean);
+                    }
+                }
+                if (lineCodes.length === 0) {
+                    showToast("Selecciona al menos una línea destino para la correspondencia.");
                     return;
                 }
-                await submitCorrAction(stId, lineCode);
+                await submitCorrAction(stId, lineCodes);
             });
 
             document.getElementById("formEditCorrespondence")?.addEventListener("submit", async (e) => {
@@ -4519,12 +4651,19 @@
                     showToast("Elige una estación existente para la correspondencia");
                     return;
                 }
-                const lineCode = document.getElementById("corrTargetLineSelect").value;
-                if (!lineCode) {
-                    showToast("Selecciona una línea destino válida (la estación ya opera en las demás)");
+                const checkedCbs = Array.from(document.querySelectorAll("#corrTargetLinesChecklist .js-corr-line-checkbox:checked"));
+                let lineCodes = checkedCbs.map(cb => cb.value);
+                if (lineCodes.length === 0) {
+                    const sel = document.getElementById("corrTargetLineSelect");
+                    if (sel && sel.value) {
+                        lineCodes = Array.from(sel.selectedOptions).map(o => o.value).filter(Boolean);
+                    }
+                }
+                if (lineCodes.length === 0) {
+                    showToast("Selecciona al menos una línea destino para la correspondencia.");
                     return;
                 }
-                await submitCorrAction(stId, lineCode);
+                await submitCorrAction(stId, lineCodes);
             });
 
             document.getElementById("corrStationsList")?.addEventListener("click", async (e) => {
@@ -4578,18 +4717,65 @@
 
         updateTargetLinesForStation(stId) {
             const selLine = document.getElementById("corrTargetLineSelect");
-            if (!selLine) return;
+            const checklist = document.getElementById("corrTargetLinesChecklist");
+            const capacityBadge = document.getElementById("corrCapacityBadge");
+            const currentLinesText = document.getElementById("corrStationCurrentLinesText");
+            const submitBtn = document.getElementById("btnSubmitAddCorrespondence");
+
             const st = NetworkStore.stationsById.get(Number(stId));
             const served = st && Array.isArray(st.lines) ? new Set(st.lines) : new Set();
+            const currentCount = served.size;
+            const remainingQuota = Math.max(0, 10 - currentCount);
+
+            if (currentLinesText && st) {
+                currentLinesText.textContent = `Líneas actuales: ${st.lines.join(", ") || "Ninguna"}`;
+            }
+            if (capacityBadge) {
+                capacityBadge.textContent = `${currentCount}/10 líneas`;
+                capacityBadge.style.background = currentCount >= 10 ? "#fee2e2" : "#e2e8f0";
+                capacityBadge.style.color = currentCount >= 10 ? "#b91c1c" : "#334155";
+            }
+            if (submitBtn) {
+                submitBtn.disabled = remainingQuota <= 0;
+            }
+
             const availableLines = NetworkStore.lines.filter(l => !served.has(l.code));
-            if (availableLines.length === 0) {
-                selLine.innerHTML = `<option value="">(La estación ya pertenece a todas las líneas)</option>`;
-                selLine.disabled = true;
-            } else {
-                selLine.disabled = false;
-                selLine.innerHTML = availableLines.map(l =>
-                    `<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
-                ).join("");
+            renderCorrespondenceLinesChecklist(checklist, selLine, availableLines, remainingQuota);
+
+            // Botones rápidas Todas / Limpiar en sidebar
+            const btnAll = document.getElementById("btnSelectAllSidebarLines");
+            if (btnAll && !btnAll.dataset.bound) {
+                btnAll.dataset.bound = "true";
+                btnAll.addEventListener("click", () => {
+                    const cbs = checklist ? Array.from(checklist.querySelectorAll(".js-corr-line-checkbox")) : [];
+                    let checkedSoFar = 0;
+                    cbs.forEach(cb => {
+                        if (checkedSoFar < remainingQuota) {
+                            cb.checked = true;
+                            checkedSoFar++;
+                        } else {
+                            cb.checked = false;
+                        }
+                    });
+                    if (selLine) {
+                        const checkedValues = new Set(cbs.filter(c => c.checked).map(c => c.value));
+                        Array.from(selLine.options).forEach(opt => {
+                            opt.selected = checkedValues.has(opt.value);
+                        });
+                    }
+                });
+            }
+
+            const btnClear = document.getElementById("btnClearSidebarLines");
+            if (btnClear && !btnClear.dataset.bound) {
+                btnClear.dataset.bound = "true";
+                btnClear.addEventListener("click", () => {
+                    const cbs = checklist ? checklist.querySelectorAll(".js-corr-line-checkbox") : [];
+                    cbs.forEach(cb => { cb.checked = false; });
+                    if (selLine) {
+                        Array.from(selLine.options).forEach(opt => { opt.selected = false; });
+                    }
+                });
             }
         },
 

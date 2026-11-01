@@ -2254,3 +2254,46 @@ body.tool-active-add_correspondence #metroSchematicSvg {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* =========================================================================
+   Indicador de Estado de Sincronización (Modo Autónomo / Servidor)
+   ========================================================================= */
+.storage-sync-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    user-select: none;
+    transition: background 0.2s, color 0.2s;
+}
+
+.storage-sync-pill.local {
+    background: rgba(14, 165, 233, 0.12);
+    color: #0284c7;
+    border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+.storage-sync-pill.online {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.sync-dot.local {
+    background: #0ea5e9;
+    box-shadow: 0 0 6px rgba(14, 165, 233, 0.6);
+}
+
+.sync-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}

@@ -59,6 +59,11 @@
             if (!resp || !resp.ok) throw new Error("Error cargando topología de la red SMyT");
             const data = await resp.json();
             this.hydrate(data);
+
+            // Re-aplicar capas de edición guardadas por el usuario en localStorage
+            if (typeof ApiClient !== "undefined" && typeof ApiClient.applyStoredEditsToStore === "function") {
+                ApiClient.applyStoredEditsToStore();
+            }
             return data;
         },
 
@@ -108,6 +113,650 @@
             };
         }
     };
+
+    // =========================================================================
+    // 1B. CLIENTE DE API CON PERSISTENCIA DUAL (ONLINE / BACKEND + OFFLINE / GITHUB PAGES)
+    // =========================================================================
+    const ApiClient = {
+        STORAGE_KEY: "simma_user_network_edits_v1",
+        isServerAvailable: null,
+
+        getStoredEdits() {
+            try {
+                const raw = localStorage.getItem(this.STORAGE_KEY);
+                return raw ? JSON.parse(raw) : { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {} };
+            } catch (e) {
+                return { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {} };
+            }
+        },
+
+        saveStoredEdits(edits) {
+            try {
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(edits));
+                this.updateConnectionStatusBadge();
+            } catch (e) {
+                console.warn("No se pudo guardar en localStorage:", e);
+            }
+        },
+
+        clearStoredEdits() {
+            try {
+                localStorage.removeItem(this.STORAGE_KEY);
+                this.updateConnectionStatusBadge();
+            } catch (e) {}
+        },
+
+        updateConnectionStatusBadge(isOnline) {
+            if (typeof isOnline === "boolean") {
+                this.isServerAvailable = isOnline;
+            }
+            const badge = document.getElementById("storageSyncBadge");
+            if (!badge) return;
+            const edits = this.getStoredEdits();
+            const editCount = (edits.createdStations?.length || 0) +
+                (edits.createdLines?.length || 0) +
+                Object.keys(edits.stations || {}).length +
+                Object.keys(edits.lines || {}).length;
+
+            if (this.isServerAvailable) {
+                badge.className = "storage-sync-pill online";
+                badge.innerHTML = `<span class="sync-dot online"></span> Conectado a Servidor (${editCount} cambios)`;
+                badge.title = "Los cambios se sincronizan con la base de datos PostgreSQL/SQLite y se respaldan localmente.";
+            } else {
+                badge.className = "storage-sync-pill local";
+                badge.innerHTML = `<span class="sync-dot local"></span> Modo Autónomo / GitHub Pages (${editCount} cambios guardados)`;
+                badge.title = "Guardado local activo en el navegador. Puedes exportar un respaldo JSON en cualquier momento.";
+            }
+        },
+
+        applyStoredEditsToStore() {
+            const edits = this.getStoredEdits();
+            if (!edits) return false;
+            let applied = false;
+
+            // 1. Estaciones creadas por el usuario
+            if (Array.isArray(edits.createdStations)) {
+                for (const s of edits.createdStations) {
+                    if (!NetworkStore.stationsById.has(s.id)) {
+                        NetworkStore.stations.push(s);
+                        NetworkStore.stationsById.set(s.id, s);
+                        applied = true;
+                    }
+                }
+            }
+
+            // 2. Líneas creadas por el usuario
+            if (Array.isArray(edits.createdLines)) {
+                for (const l of edits.createdLines) {
+                    if (!NetworkStore.linesByCode.has(l.code)) {
+                        NetworkStore.lines.push(l);
+                        NetworkStore.linesByCode.set(l.code, l);
+                        applied = true;
+                    }
+                }
+            }
+
+            // 3. Modificaciones en estaciones existentes
+            if (edits.stations && typeof edits.stations === "object") {
+                for (const [stIdStr, patch] of Object.entries(edits.stations)) {
+                    const stId = Number(stIdStr);
+                    const st = NetworkStore.stationsById.get(stId);
+                    if (st) {
+                        Object.assign(st, patch);
+                        applied = true;
+                    }
+                }
+            }
+
+            // 4. Modificaciones en líneas y trayectos
+            if (edits.lines && typeof edits.lines === "object") {
+                for (const [lineCode, patch] of Object.entries(edits.lines)) {
+                    const ln = NetworkStore.linesByCode.get(lineCode);
+                    if (ln) {
+                        Object.assign(ln, patch);
+                        applied = true;
+                    }
+                }
+            }
+
+            // 5. Polígonos urbanos
+            if (edits.cityOutlines && typeof edits.cityOutlines === "object") {
+                for (const [idStr, patch] of Object.entries(edits.cityOutlines)) {
+                    const id = Number(idStr);
+                    const outline = (NetworkStore.cityOutlines || []).find(o => o.id === id);
+                    if (outline) {
+                        Object.assign(outline, patch);
+                        applied = true;
+                    }
+                }
+            }
+
+            if (applied) {
+                NetworkStore.sortedStations = [...NetworkStore.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
+            }
+            this.updateConnectionStatusBadge();
+            return applied;
+        },
+
+        async post(endpoint, payload) {
+            const isStaticHost = window.location.hostname.includes("github.io") || window.location.protocol === "file:";
+
+            if (!isStaticHost && this.isServerAvailable !== false) {
+                try {
+                    const resp = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload || {})
+                    });
+
+                    // Si responde 405 Method Not Allowed o 404 (hosting estático):
+                    if (resp.status === 405 || resp.status === 404) {
+                        console.info(`Endpoint ${endpoint} no soportado (${resp.status}). Activando persistencia local.`);
+                        this.isServerAvailable = false;
+                        const localRes = this.applyLocalMutation(endpoint, payload, true);
+                        this.updateConnectionStatusBadge(false);
+                        return localRes;
+                    }
+
+                    const data = await resp.json().catch(() => ({}));
+                    if (resp.ok && (data.ok !== false)) {
+                        this.isServerAvailable = true;
+                        this.applyLocalMutation(endpoint, payload, true);
+                        this.updateConnectionStatusBadge(true);
+                        return { ok: true, server: true, data };
+                    }
+
+                    if (resp.status === 400) {
+                        return { ok: false, error: data.error || "Datos inválidos", status: 400 };
+                    }
+
+                    return { ok: false, error: data.error || `Error ${resp.status} del servidor`, status: resp.status };
+                } catch (netErr) {
+                    console.warn(`Servidor Django no accesible para ${endpoint}. Activando persistencia local (offline):`, netErr);
+                    this.isServerAvailable = false;
+                    const localRes = this.applyLocalMutation(endpoint, payload, true);
+                    this.updateConnectionStatusBadge(false);
+                    return localRes;
+                }
+            }
+
+            // Modo offline / GitHub Pages
+            const localRes = this.applyLocalMutation(endpoint, payload, true);
+            this.updateConnectionStatusBadge(false);
+            return localRes;
+        },
+
+        applyLocalMutation(endpoint, payload, updateStorage = true) {
+            const edits = this.getStoredEdits();
+
+            // A) Desconectar correspondencia
+            if (endpoint.includes("/correspondences") && (payload?.action === "remove" || payload?.action === "delete")) {
+                const stId = Number(payload.station_id);
+                const lineCode = String(payload.target_line_code || "").trim();
+                const st = NetworkStore.stationsById.get(stId);
+                const ln = NetworkStore.linesByCode.get(lineCode);
+
+                if (!st) return { ok: false, error: "Estación no encontrada" };
+
+                st.lines = (st.lines || []).filter(c => String(c).trim().toUpperCase() !== lineCode.toUpperCase());
+                st.is_transfer = st.lines.length > 1;
+                if (Array.isArray(st.terminal_lines)) {
+                    st.terminal_lines = st.terminal_lines.filter(c => String(c).trim().toUpperCase() !== lineCode.toUpperCase());
+                    st.is_terminal = st.terminal_lines.length > 0;
+                }
+                st.is_custom_modified = true;
+
+                if (ln && Array.isArray(ln.stops)) {
+                    ln.stops = ln.stops.filter(s => s.station_id !== stId && s.station_code !== st.code);
+                    ln.stops.forEach((s, idx) => { s.sequence = idx; });
+                    ln.declared_stations_count = ln.stops.length;
+                    ln.is_custom_modified = true;
+
+                    if (updateStorage) {
+                        edits.lines[lineCode] = { stops: ln.stops, declared_stations_count: ln.declared_stations_count, is_custom_modified: true };
+                    }
+                }
+
+                if (updateStorage) {
+                    edits.stations[stId] = {
+                        lines: st.lines,
+                        is_transfer: st.is_transfer,
+                        terminal_lines: st.terminal_lines,
+                        is_terminal: st.is_terminal,
+                        is_custom_modified: true
+                    };
+                    this.saveStoredEdits(edits);
+                }
+
+                return {
+                    ok: true,
+                    server: false,
+                    removed: true,
+                    station_id: stId,
+                    station_name: st.name,
+                    line_code: lineCode,
+                    served_lines: st.lines
+                };
+            }
+
+            // B) Agregar correspondencia(s)
+            if (endpoint.includes("/correspondences")) {
+                const st1Id = Number(payload.station_id || payload.station1 || payload.station_id_1);
+                const st2Id = Number(payload.station_id_2 || payload.station2);
+                const st1 = NetworkStore.stationsById.get(st1Id);
+
+                if (st1 && st2Id) {
+                    const st2 = NetworkStore.stationsById.get(st2Id);
+                    if (st2) {
+                        const combinedLines = Array.from(new Set([...(st1.lines || []), ...(st2.lines || [])]));
+                        st1.lines = combinedLines;
+                        st2.lines = combinedLines;
+                        st1.is_transfer = combinedLines.length > 1;
+                        st2.is_transfer = combinedLines.length > 1;
+                        st1.is_custom_modified = true;
+                        st2.is_custom_modified = true;
+
+                        if (updateStorage) {
+                            edits.stations[st1Id] = { lines: st1.lines, is_transfer: st1.is_transfer, is_custom_modified: true };
+                            edits.stations[st2Id] = { lines: st2.lines, is_transfer: st2.is_transfer, is_custom_modified: true };
+                            this.saveStoredEdits(edits);
+                        }
+
+                        return {
+                            ok: true,
+                            server: false,
+                            station_1: st1.name,
+                            station_2: st2.name,
+                            is_transfer: true,
+                            combined_lines: combinedLines
+                        };
+                    }
+                }
+
+                if (st1) {
+                    const rawLines = payload.target_line_codes || payload.target_line_code || payload.line_code || payload.lines;
+                    const linesToAdd = Array.isArray(rawLines) ? rawLines : [rawLines].filter(Boolean);
+                    const currentSet = new Set((st1.lines || []).map(c => String(c).trim().toUpperCase()));
+                    const added = [];
+
+                    for (const lc of linesToAdd) {
+                        const codeStr = String(lc).trim().toUpperCase();
+                        if (!currentSet.has(codeStr)) {
+                            currentSet.add(codeStr);
+                            added.push(codeStr);
+                        }
+                    }
+
+                    if (added.length === 0) {
+                        return { ok: false, error: "La estación ya pertenece a la(s) línea(s) seleccionada(s)." };
+                    }
+
+                    st1.lines = Array.from(currentSet);
+                    st1.is_transfer = st1.lines.length > 1;
+                    st1.is_custom_modified = true;
+
+                    for (const code of added) {
+                        const ln = NetworkStore.linesByCode.get(code);
+                        if (ln) {
+                            if (!Array.isArray(ln.stops)) ln.stops = [];
+                            const hasStop = ln.stops.some(s => s.station_id === st1.id || s.station_code === st1.code);
+                            if (!hasStop) {
+                                ln.stops.push({
+                                    id: Date.now() + Math.floor(Math.random() * 1000),
+                                    station_id: st1.id,
+                                    station_code: st1.code,
+                                    station_name: st1.name,
+                                    sequence: ln.stops.length,
+                                    branch: "main",
+                                    waypoints: []
+                                });
+                                ln.declared_stations_count = ln.stops.length;
+                                ln.is_custom_modified = true;
+                                if (updateStorage) {
+                                    edits.lines[code] = { stops: ln.stops, declared_stations_count: ln.declared_stations_count, is_custom_modified: true };
+                                }
+                            }
+                        }
+                    }
+
+                    if (updateStorage) {
+                        edits.stations[st1Id] = { lines: st1.lines, is_transfer: st1.is_transfer, is_custom_modified: true };
+                        this.saveStoredEdits(edits);
+                    }
+
+                    return {
+                        ok: true,
+                        server: false,
+                        station_id: st1.id,
+                        station_name: st1.name,
+                        is_transfer: true,
+                        added_lines: added,
+                        served_lines: st1.lines,
+                        total_lines_count: st1.lines.length
+                    };
+                }
+            }
+
+            // C) Actualizar estación
+            if (endpoint.includes("/stations/") && endpoint.includes("/update/")) {
+                const match = endpoint.match(/\/stations\/(\d+)\/update\//);
+                const stId = match ? Number(match[1]) : Number(payload?.id);
+                const st = NetworkStore.stationsById.get(stId);
+                if (st) {
+                    Object.assign(st, payload);
+                    st.is_custom_modified = true;
+                    if (updateStorage) {
+                        if (!edits.stations[stId]) edits.stations[stId] = {};
+                        Object.assign(edits.stations[stId], payload, { is_custom_modified: true });
+                        this.saveStoredEdits(edits);
+                    }
+                    return { ok: true, server: false, station: st };
+                }
+            }
+
+            // D) Crear estación
+            if (endpoint.includes("/stations/create/")) {
+                const newId = Date.now();
+                const newSt = {
+                    id: newId,
+                    code: payload.code || `estacion-custom-${newId}`,
+                    name: payload.name || "Nueva Estación",
+                    x: Number(payload.x) || 2120.0,
+                    y: Number(payload.y) || 1860.0,
+                    lat: Number(payload.lat) || 19.42,
+                    lng: Number(payload.lng) || -99.15,
+                    infrastructure_type: payload.infrastructure_type || "subterraneo",
+                    operational_status: payload.operational_status || "operational",
+                    depth_meters: Number(payload.depth_meters) || -12.0,
+                    platform_type: payload.platform_type || "central",
+                    platform_count: Number(payload.platform_count) || 2,
+                    has_psd: Boolean(payload.has_psd),
+                    is_transfer: false,
+                    is_terminal: false,
+                    is_premium_stop: false,
+                    icon_tags: Array.isArray(payload.icon_tags) ? payload.icon_tags : [],
+                    terminal_lines: [],
+                    lines: payload.line_code ? [payload.line_code] : [],
+                    is_user_created: true,
+                    is_custom_modified: true
+                };
+
+                NetworkStore.stations.push(newSt);
+                NetworkStore.stationsById.set(newSt.id, newSt);
+                NetworkStore.sortedStations = [...NetworkStore.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+                if (payload.line_code) {
+                    const ln = NetworkStore.linesByCode.get(payload.line_code);
+                    if (ln) {
+                        if (!Array.isArray(ln.stops)) ln.stops = [];
+                        ln.stops.push({
+                            id: Date.now() + 1,
+                            station_id: newSt.id,
+                            station_code: newSt.code,
+                            station_name: newSt.name,
+                            sequence: ln.stops.length,
+                            branch: "main",
+                            waypoints: []
+                        });
+                        ln.declared_stations_count = ln.stops.length;
+                        ln.is_custom_modified = true;
+                        if (updateStorage) {
+                            edits.lines[payload.line_code] = { stops: ln.stops, declared_stations_count: ln.declared_stations_count, is_custom_modified: true };
+                        }
+                    }
+                }
+
+                if (updateStorage) {
+                    edits.createdStations.push(newSt);
+                    this.saveStoredEdits(edits);
+                }
+
+                return { ok: true, server: false, station: newSt };
+            }
+
+            // E) Eliminar estación
+            if (endpoint.includes("/stations/") && endpoint.includes("/delete/")) {
+                const match = endpoint.match(/\/stations\/(\d+)\/delete\//);
+                const stId = match ? Number(match[1]) : 0;
+                NetworkStore.stations = NetworkStore.stations.filter(s => s.id !== stId);
+                NetworkStore.stationsById.delete(stId);
+                NetworkStore.sortedStations = [...NetworkStore.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+                for (const ln of NetworkStore.lines) {
+                    if (Array.isArray(ln.stops)) {
+                        ln.stops = ln.stops.filter(s => s.station_id !== stId);
+                        ln.stops.forEach((s, idx) => { s.sequence = idx; });
+                    }
+                }
+
+                if (updateStorage) {
+                    edits.createdStations = edits.createdStations.filter(s => s.id !== stId);
+                    delete edits.stations[stId];
+                    this.saveStoredEdits(edits);
+                }
+
+                return { ok: true, server: false, removed: true };
+            }
+
+            // F) Actualizar trayecto de línea
+            if (endpoint.includes("/lines/") && endpoint.includes("/route/")) {
+                const match = endpoint.match(/\/lines\/([^\/]+)\/route\//);
+                const lineCode = match ? decodeURIComponent(match[1]) : payload?.line_code;
+                const ln = NetworkStore.linesByCode.get(lineCode);
+                if (ln) {
+                    if (payload?.clear_all_waypoints && Array.isArray(ln.stops)) {
+                        ln.stops.forEach(s => { s.waypoints = []; });
+                    }
+                    if (payload?.stops) {
+                        ln.stops = payload.stops;
+                    }
+                    ln.is_custom_modified = true;
+                    if (updateStorage) {
+                        edits.lines[lineCode] = { stops: ln.stops, is_custom_modified: true };
+                        this.saveStoredEdits(edits);
+                    }
+                    return { ok: true, server: false, line_code: lineCode };
+                }
+            }
+
+            // G) Actualizar waypoints de tramo
+            if (endpoint.includes("/line-segments/") && endpoint.includes("/waypoints/")) {
+                const match = endpoint.match(/\/line-segments\/(\d+)\/waypoints\//);
+                const lsId = match ? Number(match[1]) : 0;
+                for (const ln of NetworkStore.lines) {
+                    if (Array.isArray(ln.stops)) {
+                        const stop = ln.stops.find(s => s.id === lsId);
+                        if (stop) {
+                            stop.waypoints = payload.waypoints || [];
+                            ln.is_custom_modified = true;
+                            if (updateStorage) {
+                                edits.lines[ln.code] = { stops: ln.stops, is_custom_modified: true };
+                                this.saveStoredEdits(edits);
+                            }
+                            return { ok: true, server: false, id: lsId, waypoints: stop.waypoints };
+                        }
+                    }
+                }
+                return { ok: true, server: false };
+            }
+
+            // H) Crear nueva línea
+            if (endpoint.includes("/lines/create/")) {
+                const newLine = {
+                    id: Date.now(),
+                    code: payload.code,
+                    name: payload.name,
+                    color: payload.color || "#0052ff",
+                    text_color: "#ffffff",
+                    network_type: payload.network_type || "metro",
+                    line_subtype: payload.line_subtype || "convencional",
+                    status: "operational",
+                    frequency_seconds: 180,
+                    stops: [],
+                    is_user_created: true,
+                    is_custom_modified: true
+                };
+                NetworkStore.lines.push(newLine);
+                NetworkStore.linesByCode.set(newLine.code, newLine);
+
+                if (updateStorage) {
+                    edits.createdLines.push(newLine);
+                    this.saveStoredEdits(edits);
+                }
+                return { ok: true, server: false, line: newLine };
+            }
+
+            // I) Conectar tramo entre estaciones
+            if (endpoint.includes("/line-segments/create/")) {
+                const lineCode = payload.line_code;
+                const fromId = Number(payload.from_station_id);
+                const toId = Number(payload.to_station_id);
+                const ln = NetworkStore.linesByCode.get(lineCode);
+                const st1 = NetworkStore.stationsById.get(fromId);
+                const st2 = NetworkStore.stationsById.get(toId);
+
+                if (ln && st1 && st2) {
+                    if (!Array.isArray(ln.stops)) ln.stops = [];
+                    const hasFrom = ln.stops.some(s => s.station_id === fromId);
+                    const hasTo = ln.stops.some(s => s.station_id === toId);
+
+                    if (!hasFrom) {
+                        ln.stops.push({
+                            id: Date.now() + 1,
+                            station_id: fromId,
+                            station_code: st1.code,
+                            station_name: st1.name,
+                            sequence: ln.stops.length,
+                            branch: "main",
+                            waypoints: []
+                        });
+                    }
+                    if (!hasTo) {
+                        ln.stops.push({
+                            id: Date.now() + 2,
+                            station_id: toId,
+                            station_code: st2.code,
+                            station_name: st2.name,
+                            sequence: ln.stops.length,
+                            branch: "main",
+                            waypoints: []
+                        });
+                    }
+                    ln.declared_stations_count = ln.stops.length;
+                    ln.is_custom_modified = true;
+
+                    if (!st1.lines.includes(lineCode)) st1.lines.push(lineCode);
+                    if (!st2.lines.includes(lineCode)) st2.lines.push(lineCode);
+                    st1.is_transfer = st1.lines.length > 1;
+                    st2.is_transfer = st2.lines.length > 1;
+
+                    if (updateStorage) {
+                        edits.lines[lineCode] = { stops: ln.stops, is_custom_modified: true };
+                        edits.stations[fromId] = { lines: st1.lines, is_transfer: st1.is_transfer };
+                        edits.stations[toId] = { lines: st2.lines, is_transfer: st2.is_transfer };
+                        this.saveStoredEdits(edits);
+                    }
+                    return { ok: true, server: false, line_code: lineCode };
+                }
+            }
+
+            // J) Actualizar propiedades de línea
+            if (endpoint.includes("/lines/") && endpoint.includes("/update/")) {
+                const match = endpoint.match(/\/lines\/([^\/]+)\/update\//);
+                const lineCode = match ? decodeURIComponent(match[1]) : payload?.code;
+                const ln = NetworkStore.linesByCode.get(lineCode);
+                if (ln) {
+                    Object.assign(ln, payload);
+                    ln.is_custom_modified = true;
+                    if (updateStorage) {
+                        if (!edits.lines[lineCode]) edits.lines[lineCode] = {};
+                        Object.assign(edits.lines[lineCode], payload, { is_custom_modified: true });
+                        this.saveStoredEdits(edits);
+                    }
+                    return { ok: true, server: false, line_code: lineCode };
+                }
+            }
+
+            // K) Actualizar polígono urbano
+            if (endpoint.includes("/city-outlines/") && endpoint.includes("/update/")) {
+                const match = endpoint.match(/\/city-outlines\/(\d+)\/update\//);
+                const outId = match ? Number(match[1]) : 0;
+                const outline = (NetworkStore.cityOutlines || []).find(o => o.id === outId);
+                if (outline) {
+                    if (payload.polygon_points) outline.polygon_points = payload.polygon_points;
+                    if (updateStorage) {
+                        edits.cityOutlines[outId] = { polygon_points: outline.polygon_points };
+                        this.saveStoredEdits(edits);
+                    }
+                    return { ok: true, server: false, id: outId };
+                }
+            }
+
+            // L) Guardar capa
+            if (endpoint.includes("/editor/save/") || endpoint.includes("/user-edits/save/")) {
+                this.saveStoredEdits(edits);
+                return {
+                    ok: true,
+                    server: false,
+                    result: {
+                        created_stations_count: (edits.createdStations || []).length,
+                        created_lines_count: (edits.createdLines || []).length,
+                        modified_stations_count: Object.keys(edits.stations || {}).length,
+                        route_overrides_count: Object.keys(edits.lines || {}).length
+                    }
+                };
+            }
+
+            // M) Descartar cambios
+            if (endpoint.includes("/editor/discard/") || endpoint.includes("/user-edits/discard/") || endpoint.includes("/network/reset/")) {
+                this.clearStoredEdits();
+                return { ok: true, server: false, discarded: true };
+            }
+
+            return { ok: true, server: false };
+        },
+
+        exportEditsAsJson() {
+            const edits = this.getStoredEdits();
+            const payload = {
+                version: 1,
+                exported_at: new Date().toISOString(),
+                description: "Capa de modificaciones de usuario - Metrito SMyT",
+                data: edits
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `metrito_red_usuario_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            showToast("✓ Archivo de respaldo JSON descargado");
+        },
+
+        async importEditsFromFile(file) {
+            try {
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+                const edits = parsed.data || parsed;
+                if (!edits || typeof edits !== "object") {
+                    throw new Error("Estructura JSON inválida");
+                }
+                this.saveStoredEdits(edits);
+                this.applyStoredEditsToStore();
+                await refreshNetworkDataAndRender(true);
+                showToast("✓ Capa de usuario importada exitosamente");
+            } catch (err) {
+                console.error("Error al importar JSON:", err);
+                showToast("El archivo seleccionado no tiene un formato válido");
+            }
+        }
+    };
+
 
     // =========================================================================
     // 1B. GESTOR DE HISTORIAL Y ACCIONES (DESHACER / REHACER - Ctrl+Z / Ctrl+Y)
@@ -636,14 +1285,9 @@
 
         async establishManualCorrespondence(st1Id, st2Id, st1Name = "", st2Name = "") {
             try {
-                const resp = await fetch("/api/correspondences/", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ station_id: st1Id, station_id_2: st2Id })
-                });
-                const data = await resp.json();
-                if (!resp.ok) {
-                    showToast(data.error || "No se pudo conectar correspondencia");
+                const res = await ApiClient.post("/api/correspondences/", { station_id: st1Id, station_id_2: st2Id });
+                if (!res.ok) {
+                    showToast(res.error || "No se pudo conectar correspondencia");
                     return;
                 }
                 await refreshNetworkDataAndRender(true);
@@ -653,10 +1297,11 @@
                     stationId2: st2Id,
                     description: `Transbordo manual entre ${st1Name} y ${st2Name}`
                 });
-                showToast(`✓ Transbordo conectado entre ${st1Name} y ${st2Name}`);
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`✓ Transbordo conectado entre ${st1Name} y ${st2Name}${msgMode}`);
             } catch (err) {
                 console.error("Error al establecer correspondencia manual:", err);
-                showToast("Error de conexión al conectar correspondencia");
+                showToast("Error al conectar correspondencia");
             }
         }
     };
@@ -2096,11 +2741,11 @@
         async persistSegmentWaypoints(stopObj, lineCode) {
             if (!stopObj || !stopObj.id) return;
             try {
-                const resp = await fetch(`/api/line-segments/${stopObj.id}/waypoints/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ waypoints: stopObj.waypoints || [], snap: true })
+                const res = await ApiClient.post(`/api/line-segments/${stopObj.id}/waypoints/`, {
+                    waypoints: stopObj.waypoints || [],
+                    snap: true
                 });
+                const resp = res;
                 if (resp.ok) {
                     const data = await resp.json();
                     if (data && Array.isArray(data.waypoints)) {
@@ -2444,11 +3089,7 @@
                         if (st) {
                             if (target.moved) {
                                 this.renderTracksAndStations();
-                                await fetch(`/api/stations/${st.id}/update/`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ x: st.x, y: st.y })
-                                });
+                                await ApiClient.post(`/api/stations/${st.id}/update/`, { x: st.x, y: st.y });
                                 HistoryManager.push({
                                     type: "move_station",
                                     stationId: st.id,
@@ -3528,38 +4169,19 @@
 
             this.isDisconnectingCorr = true;
             try {
-                let resp = null;
-                try {
-                    resp = await fetch("/api/correspondences/", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            action: "remove",
-                            station_id: stId,
-                            target_line_code: lineCode
-                        })
-                    });
-                } catch (netErr) {
-                    console.error("Fallo de red al desconectar correspondencia:", netErr);
-                    showToast("No se pudo conectar con el servidor Django. Verifica que esté activo.");
+                const res = await ApiClient.post("/api/correspondences/", {
+                    action: "remove",
+                    station_id: stId,
+                    target_line_code: lineCode
+                });
+
+                if (!res.ok) {
+                    showToast(res.error || `No se pudo desconectar de la Línea ${lineCode}`);
                     return;
                 }
 
-                let data = null;
-                try {
-                    data = await resp.json();
-                } catch (jsonErr) {
-                    console.error("Respuesta no válida del servidor:", resp.status, jsonErr);
-                    showToast(`Error ${resp.status} al procesar la desconexión en el servidor.`);
-                    return;
-                }
-
-                if (!resp.ok || !data?.ok) {
-                    showToast(data?.error || `Error ${resp.status}: no se pudo desconectar de la Línea ${lineCode}`);
-                    return;
-                }
-
-                showToast(`✓ "${stName}" desconectada de la Línea ${lineCode}`);
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`✓ "${stName}" desconectada de la Línea ${lineCode}${msgMode}`);
                 try {
                     await refreshNetworkDataAndRender(true);
                     if (NetworkStore.selectedStationId === stId) {
@@ -3578,20 +4200,18 @@
             const stId = Number(stationId);
             const st = NetworkStore.stationsById.get(stId);
             const name = stationName || (st ? st.name : `Estación ${stId}`);
-            if (!confirm(`¿Eliminar definitivamente la estación "${name}"?\nSe desvinculará de todas las líneas y tramos conectados.`)) {
+            if (!confirm(`¿Eliminar definitivamente la estación "${name}"?
+Se desvinculará de todas las líneas y tramos conectados.`)) {
                 return;
             }
             try {
-                const resp = await fetch(`/api/stations/${stId}/delete/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" }
-                });
-                const data = await resp.json();
-                if (!resp.ok) {
-                    showToast(data.error || "No se pudo eliminar la estación");
+                const res = await ApiClient.post(`/api/stations/${stId}/delete/`, {});
+                if (!res.ok) {
+                    showToast(res.error || "No se pudo eliminar la estación");
                     return;
                 }
-                showToast(`✓ Estación "${name}" eliminada`);
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`✓ Estación "${name}" eliminada${msgMode}`);
                 if (NetworkStore.selectedStationId === stId) {
                     NetworkStore.selectedStationId = null;
                     document.getElementById("stationInspectorContent")?.classList.add("hidden");
@@ -3599,7 +4219,8 @@
                 }
                 await refreshNetworkDataAndRender(true);
             } catch (err) {
-                showToast("Error de conexión al eliminar la estación");
+                console.error("Error al eliminar estación:", err);
+                showToast("Error al eliminar la estación");
             }
         },
 
@@ -4215,18 +4836,14 @@
                     min_curve_radius_m: parseFloat(document.getElementById("editLineRadius").value),
                     status_note: document.getElementById("editLineNote").value
                 };
-                const resp = await fetch(`/api/lines/${encodeURIComponent(code)}/update/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                if (!resp.ok) {
-                    const data = await resp.json().catch(() => ({}));
-                    showToast(data.error || `Error al actualizar la Línea ${code}`);
+                const res = await ApiClient.post(`/api/lines/${encodeURIComponent(code)}/update/`, payload);
+                if (!res.ok) {
+                    showToast(res.error || `Error al actualizar la Línea ${code}`);
                     return;
                 }
                 await refreshNetworkDataAndRender(true);
-                showToast(`Línea ${code} actualizada y sincronizada en el mapa`);
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`✓ Línea ${code} actualizada y sincronizada en el mapa${msgMode}`);
             });
 
             // Controles de Trayecto y Moldeado de Trazos de la Línea
@@ -4259,21 +4876,20 @@
                 const code = document.getElementById("editLineSelect")?.value;
                 if (!code) return;
                 try {
-                    const resp = await fetch(`/api/lines/${encodeURIComponent(code)}/route/`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ clear_all_waypoints: true, straighten_orthogonal: true })
+                    const res = await ApiClient.post(`/api/lines/${encodeURIComponent(code)}/route/`, {
+                        clear_all_waypoints: true,
+                        straighten_orthogonal: true
                     });
-                    const resData = await resp.json();
-                    if (resp.ok) {
+                    if (res.ok) {
                         await refreshNetworkDataAndRender(false);
                         this.loadLineIntoEditor(code);
-                        showToast(`✓ Trazos de Línea ${code} enderezados derecho (90° / 180°)`);
+                        const msgMode = res.server ? "" : " (guardado localmente)";
+                        showToast(`✓ Trazos de Línea ${code} enderezados derecho (90° / 180°)${msgMode}`);
                     } else {
-                        showToast(resData.error || "No se pudieron enderezar los trazos");
+                        showToast(res.error || "No se pudieron enderezar los trazos");
                     }
                 } catch (err) {
-                    showToast("Error de conexión al enderezar trazos");
+                    showToast("Error al enderezar trazos");
                 }
             });
 
@@ -4380,21 +4996,18 @@
                 const terminalIds = NetworkStore.draftRouteStops
                     .filter(s => s.is_terminal_for_line)
                     .map(s => s.station_id);
-                const resp = await fetch(`/api/lines/${encodeURIComponent(code)}/route/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        stops: NetworkStore.draftRouteStops,
-                        terminal_station_ids: terminalIds,
-                        snap: true
-                    })
+                const res = await ApiClient.post(`/api/lines/${encodeURIComponent(code)}/route/`, {
+                    stops: NetworkStore.draftRouteStops,
+                    terminal_station_ids: terminalIds,
+                    snap: true
                 });
-                if (resp.ok) {
+                if (res.ok) {
                     await refreshNetworkDataAndRender(true);
                     this.loadLineIntoEditor(code);
-                    showToast(`Trayecto y terminales de Línea ${code} guardados (${NetworkStore.draftRouteStops.length} paradas)`);
+                    const msgMode = res.server ? "" : " (guardado localmente)";
+                    showToast(`✓ Trayecto y terminales de Línea ${code} guardados (${NetworkStore.draftRouteStops.length} paradas)${msgMode}`);
                 } else {
-                    showToast("No se pudo guardar el trayecto. Verifica las estaciones.");
+                    showToast(res.error || "No se pudo guardar el trayecto. Verifica las estaciones.");
                 }
             });
 
@@ -4422,19 +5035,15 @@
                     icon_tags: selectedTags,
                     terminal_lines: selectedTerminals
                 };
-                const resp = await fetch(`/api/stations/${stId}/update/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                if (!resp.ok) {
-                    const data = await resp.json().catch(() => ({}));
-                    showToast(data.error || "Error al actualizar la estación");
+                const res = await ApiClient.post(`/api/stations/${stId}/update/`, payload);
+                if (!res.ok) {
+                    showToast(res.error || "Error al actualizar la estación");
                     return;
                 }
                 await refreshNetworkDataAndRender(false);
                 this.selectStation(Number(stId));
-                showToast("Estación, terminales y tags actualizados en la cartografía");
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`✓ Estación, terminales y tags actualizados en la cartografía${msgMode}`);
             });
 
             // Guardar edición de Polígono de la Ciudad
@@ -4447,13 +5056,10 @@
                     opacity: parseFloat(document.getElementById("editCityOpacity").value),
                     elevation_m: parseFloat(document.getElementById("editCityElevation").value)
                 };
-                await fetch(`/api/city-outlines/${outlineId}/update/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
+                const res = await ApiClient.post(`/api/city-outlines/${outlineId}/update/`, payload);
                 await refreshNetworkDataAndRender(false);
-                showToast("Polígono geográfico de la ciudad actualizado");
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`✓ Polígono geográfico de la ciudad actualizado${msgMode}`);
             });
 
             // Botón Restaurar Plan Maestro original
@@ -4493,32 +5099,47 @@
             // Guardar y Descartar Capa de Usuario
             document.getElementById("btnSaveUserLayer")?.addEventListener("click", async () => {
                 try {
-                    const resp = await fetch("/api/editor/save/", { method: "POST" });
-                    const resData = await resp.json();
-                    if (resp.ok) {
-                        showToast(`💾 Capa de red de usuario guardada con éxito (${resData.result?.created_stations_count || 0} est. nuevas, ${resData.result?.created_lines_count || 0} líneas)`);
+                    const res = await ApiClient.post("/api/editor/save/", {});
+                    if (res.ok) {
+                        const resData = res.data || res;
+                        const msgMode = res.server ? "en servidor y local" : "en almacenamiento local";
+                        showToast(`💾 Capa de red guardada con éxito (${msgMode})`);
                     } else {
-                        showToast(resData.error || "Error al guardar capa de usuario");
+                        showToast(res.error || "Error al guardar capa de usuario");
                     }
                 } catch (err) {
-                    showToast("Error de conexión al guardar capa");
+                    showToast("Error al guardar capa");
                 }
             });
 
             document.getElementById("btnDiscardUserLayer")?.addEventListener("click", async () => {
                 if (confirm("¿Deseas descartar todas las modificaciones y volver al Plan Maestro original?")) {
                     try {
-                        const resp = await fetch("/api/editor/discard/", { method: "POST" });
-                        if (resp.ok) {
-                            HistoryManager.undoStack = [];
-                            HistoryManager.redoStack = [];
-                            HistoryManager.updateButtons();
-                            await refreshNetworkDataAndRender(true);
-                            showToast("↺ Red restaurada al Plan Maestro original");
-                        }
+                        ApiClient.clearStoredEdits();
+                        await ApiClient.post("/api/editor/discard/", {});
+                        HistoryManager.undoStack = [];
+                        HistoryManager.redoStack = [];
+                        HistoryManager.updateButtons();
+                        await refreshNetworkDataAndRender(true);
+                        showToast("↺ Red restaurada al Plan Maestro original");
                     } catch (err) {
                         showToast("Error al descartar modificaciones");
                     }
+                }
+            });
+
+            // Exportar e Importar Respaldo JSON de usuario
+            document.getElementById("btnExportUserLayerJson")?.addEventListener("click", () => {
+                ApiClient.exportEditsAsJson();
+            });
+            document.getElementById("btnImportUserLayerJson")?.addEventListener("click", () => {
+                document.getElementById("inputImportUserLayerJson")?.click();
+            });
+            document.getElementById("inputImportUserLayerJson")?.addEventListener("change", async (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                    await ApiClient.importEditsFromFile(file);
+                    e.target.value = "";
                 }
             });
 
@@ -4595,28 +5216,28 @@
                 };
 
                 try {
-                    const resp = await fetch("/api/stations/create/", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-                    const resData = await resp.json();
-                    if (!resp.ok) {
-                        showToast(resData.error || "Error al crear la estación");
+                    const res = await ApiClient.post("/api/stations/create/", payload);
+                    if (!res.ok) {
+                        showToast(res.error || "Error al crear la estación");
                         return;
                     }
+                    const resData = res.data || res;
                     closeAllEditorModals();
                     await refreshNetworkDataAndRender(true);
-                    this.selectStation(resData.station.id);
-                    SchematicMapEngine.flyToBox(resData.station.x - 300, resData.station.y - 200, 600, 400);
+                    const stObj = resData.station || payload;
+                    if (stObj.id) this.selectStation(stObj.id);
+                    if (stObj.x && stObj.y) {
+                        SchematicMapEngine.flyToBox(stObj.x - 300, stObj.y - 200, 600, 400);
+                    }
                     HistoryManager.push({
                         type: "station_create",
-                        stationId: resData.station.id,
+                        stationId: stObj.id,
                         description: `Crear estación "${name}"`
                     });
-                    showToast(`✓ Estación "${name}" creada exitosamente`);
+                    const msgMode = res.server ? "" : " (guardado localmente)";
+                    showToast(`✓ Estación "${name}" creada exitosamente${msgMode}`);
                 } catch (err) {
-                    showToast("Error de conexión al crear estación");
+                    showToast("Error al crear estación");
                 }
             });
 
@@ -4635,20 +5256,15 @@
                 }
 
                 try {
-                    const resp = await fetch("/api/lines/create/", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
+                    const res = await ApiClient.post("/api/lines/create/", {
                             code,
                             name,
                             color,
                             network_type: netType,
                             line_subtype: subType
-                        })
-                    });
-                    const resData = await resp.json();
-                    if (!resp.ok) {
-                        showToast(resData.error || "Error al crear la línea");
+                        });
+                    if (!res.ok) {
+                        showToast(res.error || "Error al crear la línea");
                         return;
                     }
                     await refreshNetworkDataAndRender();
@@ -4661,7 +5277,8 @@
                         lineCode: code,
                         description: `Crear Línea ${code}`
                     });
-                    showToast(`✓ Línea ${code} creada exitosamente`);
+                    const msgMode = res.server ? "" : " (guardado localmente)";
+                    showToast(`✓ Línea ${code} creada exitosamente${msgMode}`);
 
                     if (VisualEditorTools.pendingLineCaller === "station") {
                         VisualEditorTools.pendingLineCaller = null;
@@ -4705,18 +5322,13 @@
                 }
 
                 try {
-                    const resp = await fetch("/api/line-segments/create/", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
+                    const res = await ApiClient.post("/api/line-segments/create/", {
                             line_code: lineCode,
                             from_station_id: fromId,
                             to_station_id: toId
-                        })
-                    });
-                    const resData = await resp.json();
-                    if (!resp.ok) {
-                        showToast(resData.error || "Error al conectar el tramo");
+                        });
+                    if (!res.ok) {
+                        showToast(res.error || "Error al conectar el tramo");
                         return;
                     }
                     closeAllEditorModals();
@@ -4728,9 +5340,10 @@
                         toId,
                         description: `Conectar tramo en Línea ${lineCode}`
                     });
-                    showToast(`Tramo conectado en Línea ${lineCode}`);
+                    const msgMode = res.server ? "" : " (guardado localmente)";
+                    showToast(`✓ Tramo conectado en Línea ${lineCode}${msgMode}`);
                 } catch (err) {
-                    showToast("Error de conexión al conectar tramo");
+                    showToast("Error al conectar tramo");
                 }
             });
 
@@ -4742,16 +5355,12 @@
                         : (Array.isArray(lineCodes)
                             ? { station_id: stId, target_line_codes: lineCodes }
                             : { station_id: stId, target_line_code: lineCodes });
-                    const resp = await fetch("/api/correspondences/create/", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-                    const resData = await resp.json();
-                    if (!resp.ok) {
-                        showToast(resData.error || "Error al establecer correspondencia");
+                    const res = await ApiClient.post("/api/correspondences/create/", payload);
+                    if (!res.ok) {
+                        showToast(res.error || "Error al establecer correspondencia");
                         return;
                     }
+                    const resData = res.data || res;
                     closeAllEditorModals();
                     await refreshNetworkDataAndRender();
                     this.selectStation(stId);
@@ -4764,11 +5373,12 @@
                         type: "correspondence_create",
                         stationId: stId,
                         lineCodes: Array.isArray(lineCodes) ? lineCodes : [lineCodes],
-                        description: `Correspondencia Línea(s) ${addedNames} en ${resData.station_name}`
+                        description: `Correspondencia Línea(s) ${addedNames} en ${resData.station_name || "estación"}`
                     });
-                    showToast(`✓ Correspondencia establecida con Línea(s) ${addedNames} en ${resData.station_name} (${totalCount}/10 líneas)`);
+                    const msgMode = res.server ? "" : " (guardado localmente)";
+                    showToast(`✓ Correspondencia establecida con Línea(s) ${addedNames} en ${resData.station_name || "estación"} (${totalCount}/10 líneas)${msgMode}`);
                 } catch (err) {
-                    showToast("Error de conexión al crear correspondencia");
+                    showToast("Error al crear correspondencia");
                 }
             };
 

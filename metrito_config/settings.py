@@ -26,6 +26,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'metrito_config.cors.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -56,17 +57,31 @@ WSGI_APPLICATION = 'metrito_config.wsgi.application'
 
 db_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
 if db_url:
-    parsed = urllib.parse.urlparse(db_url)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': parsed.path.lstrip('/'),
-            'USER': parsed.username,
-            'PASSWORD': parsed.password,
-            'HOST': parsed.hostname,
-            'PORT': parsed.port or '5432',
+    try:
+        import dj_database_url
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=db_url,
+                conn_max_age=600,
+                conn_health_checks=True,
+                ssl_require=True,
+            )
         }
-    }
+    except Exception:
+        parsed = urllib.parse.urlparse(db_url)
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': parsed.path.lstrip('/'),
+                'USER': urllib.parse.unquote(parsed.username or ''),
+                'PASSWORD': urllib.parse.unquote(parsed.password or ''),
+                'HOST': parsed.hostname,
+                'PORT': parsed.port or '5432',
+                'OPTIONS': {
+                    'sslmode': 'require',
+                },
+            }
+        }
 else:
     DATABASES = {
         'default': {

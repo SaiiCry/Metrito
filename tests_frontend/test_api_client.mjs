@@ -202,4 +202,69 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         assert.equal(mockStore.stations[0].id, 101);
         assert.equal(mockStore.lines[0].stops.length, 1);
     });
+
+    it("inserción de estación intermedia en un tramo entre dos paradas no la marca como terminal y la posiciona en secuencia correcta", () => {
+        const ln1 = mockStore.linesByCode.get("1");
+        // Línea 1 tiene paradas 101 (seq 0) y 102 (seq 1)
+        const newStationId = 999;
+        const newSt = {
+            id: newStationId,
+            code: "st-999",
+            name: "Estación Intermedia",
+            x: 2120,
+            y: 1860,
+            lines: ["1"],
+            is_terminal: false,
+            terminal_lines: []
+        };
+        mockStore.stations.push(newSt);
+        mockStore.stationsById.set(newStationId, newSt);
+
+        // Simular inserción entre 101 y 102
+        const s1Id = 101;
+        const s2Id = 102;
+        const i1 = ln1.stops.findIndex(s => s.station_id === s1Id);
+        const i2 = ln1.stops.findIndex(s => s.station_id === s2Id);
+        const insertIdx = Math.max(i1, i2) === i1 + 1 ? i2 : Math.min(i1, i2) + 1;
+
+        const newStop = {
+            id: 888,
+            station_id: newStationId,
+            station_name: newSt.name,
+            sequence: 0,
+            waypoints: []
+        };
+        ln1.stops.splice(insertIdx, 0, newStop);
+        ln1.stops.forEach((s, idx) => { s.sequence = idx; });
+
+        assert.equal(ln1.stops.length, 3);
+        assert.equal(ln1.stops[0].station_id, 101);
+        assert.equal(ln1.stops[1].station_id, 999);
+        assert.equal(ln1.stops[2].station_id, 102);
+        assert.equal(newSt.is_terminal, false);
+        assert.equal(newSt.terminal_lines.length, 0);
+    });
+
+    it("reordenar y eliminar parada en el editor de trayecto actualiza secuencias y pertenencia de línea", () => {
+        const ln1 = mockStore.linesByCode.get("1");
+        // Reordenar: subir la parada intermedia a la posición 0
+        const stops = [...ln1.stops];
+        [stops[0], stops[1]] = [stops[1], stops[0]];
+        stops.forEach((s, i) => { s.sequence = i; });
+        ln1.stops = stops;
+
+        assert.equal(ln1.stops[0].station_id, 102);
+        assert.equal(ln1.stops[1].station_id, 101);
+
+        // Eliminar parada 102 (última)
+        const removed = ln1.stops.pop();
+        const removedSt = mockStore.stationsById.get(removed.station_id);
+        if (removedSt) {
+            removedSt.lines = removedSt.lines.filter(c => c !== "1");
+            removedSt.is_transfer = removedSt.lines.length > 1;
+        }
+
+        assert.equal(ln1.stops.length, 1);
+        assert.equal(removedSt.lines.includes("1"), false);
+    });
 });

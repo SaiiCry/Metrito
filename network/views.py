@@ -1020,8 +1020,54 @@ def api_create_station(request):
             if not line_obj:
                 line_obj = TransitLine.objects.filter(name__iexact=str(line_code).strip()).first()
             if line_obj:
-                last_seq = LineStation.objects.filter(line=line_obj, branch="main").order_by("-sequence").values_list("sequence", flat=True).first()
-                seq = (last_seq + 1) if last_seq is not None else 0
+                s1_id = payload.get("s1_id")
+                s2_id = payload.get("s2_id")
+                seq = None
+
+                if s1_id and s2_id:
+                    ls1 = LineStation.objects.filter(line=line_obj, station_id=s1_id).first()
+                    ls2 = LineStation.objects.filter(line=line_obj, station_id=s2_id).first()
+                    if ls1 and ls2:
+                        min_seq = min(ls1.sequence, ls2.sequence)
+                        seq = min_seq + 1
+                        LineStation.objects.filter(line=line_obj, sequence__gte=seq).update(sequence=models.F("sequence") + 1)
+                        ls1.waypoints = []
+                        ls1.save(update_fields=["waypoints"])
+                if seq is None:
+                    # Detectar si (x, y) cae entre dos estaciones de esta línea
+                    stops_in_order = list(LineStation.objects.filter(line=line_obj).select_related("station").order_by("sequence"))
+                    for i in range(len(stops_in_order) - 1):
+                        st_a = stops_in_order[i].station
+                        st_b = stops_in_order[i + 1].station
+                        dx = float(st_b.x) - float(st_a.x)
+                        dy = float(st_b.y) - float(st_a.y)
+                        len_sq = dx * dx + dy * dy
+                        if len_sq == 0:
+                            continue
+                        t = ((x - float(st_a.x)) * dx + (y - float(st_a.y)) * dy) / len_sq
+                        if -0.05 <= t <= 1.05:
+                            t_clamped = max(0.0, min(1.0, t))
+                            proj_x = float(st_a.x) + t_clamped * dx
+                            proj_y = float(st_a.y) + t_clamped * dy
+                            dist = ((x - proj_x) ** 2 + (y - proj_y) ** 2) ** 0.5
+                            if dist <= 75.0:
+                                ls1 = stops_in_order[i]
+                                seq = ls1.sequence + 1
+                                LineStation.objects.filter(line=line_obj, sequence__gte=seq).update(sequence=models.F("sequence") + 1)
+                                ls1.waypoints = []
+                                ls1.save(update_fields=["waypoints"])
+                                break
+
+                if seq is None:
+                    last_seq = LineStation.objects.filter(line=line_obj, branch="main").order_by("-sequence").values_list("sequence", flat=True).first()
+                    seq = (last_seq + 1) if last_seq is not None else 0
+
+                # Una estación intermedia insertada nunca es terminal
+                if station.is_terminal and not terminal_lines:
+                    station.is_terminal = False
+                    station.terminal_lines = []
+                    station.save(update_fields=["is_terminal", "terminal_lines"])
+
                 LineStation.objects.create(
                     line=line_obj,
                     station=station,

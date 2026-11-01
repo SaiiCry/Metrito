@@ -621,10 +621,6 @@
                                 ⚡ Enderezar Trazos (90° / 180°)
                             </button>
                         </div>
-                        <div class="route-add-row">
-                            <select id="addRouteStationSelect" class="form-control"></select>
-                            <button type="button" class="btn-secondary btn-xs" id="btnAddStationToRoute">+ Parada</button>
-                        </div>
                         <div class="route-stops-list" id="lineRouteStopsList">
                             <!-- Lista ordenable de estaciones del trayecto -->
                         </div>
@@ -850,6 +846,9 @@
                 <button type="button" class="icon-btn" id="btnCloseNewStationModal" aria-label="Cerrar ventana">✕</button>
             </div>
             <form id="formCreateStationModal" class="modal-body">
+                <input type="hidden" id="newStationInsertS1" value="">
+                <input type="hidden" id="newStationInsertS2" value="">
+                <input type="hidden" id="newStationInsertLine" value="">
                 <div class="form-group">
                     <label for="newStationName">Nombre de la Estación</label>
                     <input type="text" id="newStationName" class="form-control" placeholder="Ej. Jardines del Norte" required>

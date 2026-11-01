@@ -98,12 +98,21 @@ button, input, select, textarea {
     color: inherit;
 }
 
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+button:focus-visible {
     outline: 2px solid var(--accent-primary);
     outline-offset: 2px;
+}
+
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+.form-control:focus {
+    outline: none !important;
+    border-color: var(--border-strong) !important;
+    box-shadow: none !important;
 }
 
 /* ==========================================================================

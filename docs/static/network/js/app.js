@@ -137,6 +137,36 @@
     // =========================================================================
     // 1B. CLIENTE DE API CON PERSISTENCIA DUAL (ONLINE / BACKEND + OFFLINE / GITHUB PAGES)
     // =========================================================================
+    // Helper: Encuentra el tramo adyacente más cercano a (x, y) en una línea para inserción limpia
+    function findBestSegmentForPoint(lineCode, x, y, maxDistance = 75) {
+        const ln = NetworkStore.linesByCode.get(lineCode);
+        if (!ln || !Array.isArray(ln.stops) || ln.stops.length < 2) return null;
+        let bestDist = Infinity;
+        let bestPair = null;
+        for (let i = 0; i < ln.stops.length - 1; i++) {
+            const s1 = ln.stops[i];
+            const s2 = ln.stops[i + 1];
+            const st1 = NetworkStore.stationsById.get(s1.station_id);
+            const st2 = NetworkStore.stationsById.get(s2.station_id);
+            if (!st1 || !st2) continue;
+            const dx = st2.x - st1.x;
+            const dy = st2.y - st1.y;
+            const lenSq = dx * dx + dy * dy;
+            if (lenSq === 0) continue;
+            let t = ((x - st1.x) * dx + (y - st1.y) * dy) / lenSq;
+            if (t < -0.05 || t > 1.05) continue;
+            t = Math.max(0, Math.min(1, t));
+            const projX = st1.x + t * dx;
+            const projY = st1.y + t * dy;
+            const dist = Math.hypot(x - projX, y - projY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestPair = { s1Id: s1.station_id, s2Id: s2.station_id, insertIdx: i + 1, dist };
+            }
+        }
+        return (bestDist <= maxDistance) ? bestPair : null;
+    }
+
     const ApiClient = {
         STORAGE_KEY: "simma_user_network_edits_v1",
         isServerAvailable: null,
@@ -572,9 +602,10 @@
                 }
             }
 
-            // D) Crear estación
+            // D) Crear estación (con soporte para inserción intermedia entre dos estaciones sin ser terminal)
             if (endpoint.includes("/stations/create/")) {
                 const newId = Date.now();
+                const lineCode = payload.initial_line || payload.line_code || (Array.isArray(payload.lines) && payload.lines[0]) || null;
                 const newSt = {
                     id: newId,
                     code: payload.code || `estacion-custom-${newId}`,
@@ -594,7 +625,7 @@
                     is_premium_stop: false,
                     icon_tags: Array.isArray(payload.icon_tags) ? payload.icon_tags : [],
                     terminal_lines: [],
-                    lines: payload.line_code ? [payload.line_code] : [],
+                    lines: lineCode ? [lineCode] : [],
                     is_user_created: true,
                     is_custom_modified: true
                 };
@@ -603,23 +634,65 @@
                 NetworkStore.stationsById.set(newSt.id, newSt);
                 NetworkStore.sortedStations = [...NetworkStore.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
 
-                if (payload.line_code) {
-                    const ln = NetworkStore.linesByCode.get(payload.line_code);
+                if (lineCode) {
+                    const ln = NetworkStore.linesByCode.get(lineCode);
                     if (ln) {
                         if (!Array.isArray(ln.stops)) ln.stops = [];
-                        ln.stops.push({
+                        let s1Id = payload.s1_id ? Number(payload.s1_id) : null;
+                        let s2Id = payload.s2_id ? Number(payload.s2_id) : null;
+
+                        if (!s1Id && !s2Id && ln.stops.length >= 2) {
+                            const detected = findBestSegmentForPoint(lineCode, newSt.x, newSt.y);
+                            if (detected) {
+                                s1Id = detected.s1Id;
+                                s2Id = detected.s2Id;
+                            }
+                        }
+
+                        let insertIdx = -1;
+                        if (s1Id && s2Id) {
+                            const i1 = ln.stops.findIndex(s => Number(s.station_id) === s1Id);
+                            const i2 = ln.stops.findIndex(s => Number(s.station_id) === s2Id);
+                            if (i1 >= 0 && i2 >= 0) {
+                                insertIdx = Math.max(i1, i2) === i1 + 1 ? i2 : Math.min(i1, i2) + 1;
+                            }
+                        }
+
+                        const newStopObj = {
                             id: Date.now() + 1,
                             station_id: newSt.id,
                             station_code: newSt.code,
                             station_name: newSt.name,
-                            sequence: ln.stops.length,
+                            sequence: 0,
                             branch: "main",
+                            segment_infrastructure: newSt.infrastructure_type,
+                            segment_status: newSt.operational_status,
+                            depth_meters: newSt.depth_meters,
                             waypoints: []
-                        });
+                        };
+
+                        if (insertIdx >= 0) {
+                            if (insertIdx > 0 && ln.stops[insertIdx - 1]) {
+                                ln.stops[insertIdx - 1].waypoints = [];
+                            }
+                            ln.stops.splice(insertIdx, 0, newStopObj);
+                            newSt.is_terminal = false;
+                            newSt.terminal_lines = [];
+                        } else {
+                            ln.stops.push(newStopObj);
+                            newSt.is_terminal = false;
+                            newSt.terminal_lines = [];
+                        }
+
+                        ln.stops.forEach((s, idx) => { s.sequence = idx; });
                         ln.declared_stations_count = ln.stops.length;
                         ln.is_custom_modified = true;
                         if (updateStorage) {
-                            edits.lines[payload.line_code] = { stops: ln.stops, declared_stations_count: ln.declared_stations_count, is_custom_modified: true };
+                            edits.lines[lineCode] = {
+                                stops: ln.stops,
+                                declared_stations_count: ln.declared_stations_count,
+                                is_custom_modified: true
+                            };
                         }
                     }
                 }
@@ -682,10 +755,58 @@
                     }
                     if (payload?.stops) {
                         ln.stops = payload.stops;
+                        ln.stops.forEach((s, idx) => { s.sequence = idx; });
+                        ln.declared_stations_count = ln.stops.length;
                     }
                     ln.is_custom_modified = true;
+
+                    // Sincronizar membresía de línea en estaciones afectadas
+                    const currentStationIds = new Set(ln.stops.map(s => Number(s.station_id)));
+                    for (const st of NetworkStore.stations) {
+                        const hasLine = (st.lines || []).includes(lineCode);
+                        const inCurrent = currentStationIds.has(Number(st.id));
+                        if (hasLine && !inCurrent) {
+                            st.lines = st.lines.filter(c => c !== lineCode);
+                            st.is_transfer = st.lines.length > 1;
+                            if (Array.isArray(st.terminal_lines)) {
+                                st.terminal_lines = st.terminal_lines.filter(c => c !== lineCode);
+                                st.is_terminal = st.terminal_lines.length > 0;
+                            }
+                            st.is_custom_modified = true;
+                            if (updateStorage) {
+                                if (!edits.stations) edits.stations = {};
+                                edits.stations[st.id] = {
+                                    lines: st.lines,
+                                    is_transfer: st.is_transfer,
+                                    terminal_lines: st.terminal_lines,
+                                    is_terminal: st.is_terminal,
+                                    is_custom_modified: true
+                                };
+                            }
+                        } else if (!hasLine && inCurrent) {
+                            if (!st.lines) st.lines = [];
+                            st.lines.push(lineCode);
+                            st.is_transfer = st.lines.length > 1;
+                            st.is_custom_modified = true;
+                            if (updateStorage) {
+                                if (!edits.stations) edits.stations = {};
+                                edits.stations[st.id] = {
+                                    lines: st.lines,
+                                    is_transfer: st.is_transfer,
+                                    terminal_lines: st.terminal_lines,
+                                    is_terminal: st.is_terminal,
+                                    is_custom_modified: true
+                                };
+                            }
+                        }
+                    }
+
                     if (updateStorage) {
-                        edits.lines[lineCode] = { stops: ln.stops, is_custom_modified: true };
+                        edits.lines[lineCode] = {
+                            stops: ln.stops,
+                            declared_stations_count: ln.declared_stations_count,
+                            is_custom_modified: true
+                        };
                         this.saveStoredEdits(edits);
                     }
                     return { ok: true, server: false, line_code: lineCode };
@@ -1180,13 +1301,16 @@
             SchematicMapEngine.renderRubberBand(null);
         },
 
-        openNewStationModal(x = null, y = null, initialLine = null) {
+        openNewStationModal(x = null, y = null, initialLine = null, insertBetween = null) {
             const modal = document.getElementById("modalNewStation");
             if (!modal) return;
             const inputX = document.getElementById("newStationX");
             const inputY = document.getElementById("newStationY");
             const inputName = document.getElementById("newStationName");
             const selectLine = document.getElementById("newStationInitialLine");
+            const inputS1 = document.getElementById("newStationInsertS1");
+            const inputS2 = document.getElementById("newStationInsertS2");
+            const inputInsertLine = document.getElementById("newStationInsertLine");
 
             let posX = x;
             let posY = y;
@@ -1221,6 +1345,10 @@
                     selectLine.value = chosenLine;
                 }
             }
+
+            if (inputS1) inputS1.value = insertBetween?.s1Id ? String(insertBetween.s1Id) : "";
+            if (inputS2) inputS2.value = insertBetween?.s2Id ? String(insertBetween.s2Id) : "";
+            if (inputInsertLine) inputInsertLine.value = initialLine || "";
 
             modal.classList.remove("hidden");
         },
@@ -1462,17 +1590,8 @@
 
                 showToast(`✓ Conectado: ${st1.name} ↔ ${st2.name} en Línea ${lineCode}`);
 
-                // Continuidad fluida estilo MetroMapMaker: toId se convierte en el nuevo origen para encadenar trazos
-                this.segmentSourceStationId = toId;
-                document.querySelectorAll(".svg-station-node.connect-source").forEach(el => el.classList.remove("connect-source"));
-                const nextNodeEl = document.querySelector(`.svg-station-node[data-station-id="${toId}"]`);
-                if (nextNodeEl) nextNodeEl.classList.add("connect-source");
-
-                const statusText = document.getElementById("edToolActiveText");
-                if (statusText) {
-                    statusText.textContent = `Extremo actual: ${st2.name} (Línea ${lineCode}). Continúa haciendo clic para extender el trazo.`;
-                }
-                SchematicMapEngine.renderRubberBand(null);
+                // Finalizar la conexión: limpiar la guía inmediatamente y desactivar la herramienta para evitar errores
+                this.clearActiveTool();
             } catch (err) {
                 console.error("Error al conectar tramo directo:", err);
                 showToast("Error al conectar estaciones");
@@ -1770,7 +1889,7 @@
             this.show(clientX, clientY, html);
             this.el.querySelector(".js-ctx-create-station-track")?.addEventListener("click", () => {
                 this.hide();
-                VisualEditorTools.openNewStationModal(posX, posY, lineCode);
+                VisualEditorTools.openNewStationModal(posX, posY, lineCode, { s1Id, s2Id });
             });
             this.el.querySelector(".js-ctx-straighten-line")?.addEventListener("click", async () => {
                 this.hide();
@@ -3230,7 +3349,15 @@
                 if (VisualEditorTools.activeTool === "add_station" && e.button === 0) {
                     e.stopPropagation();
                     const svgPt = this.clientToSvgCoords(e.clientX, e.clientY);
-                    VisualEditorTools.openNewStationModal(svgPt.x, svgPt.y);
+                    const trackHitEl = e.target.closest(".svg-track-hit");
+                    if (trackHitEl) {
+                        const lineCode = trackHitEl.dataset.lineCode;
+                        const s1Id = Number(trackHitEl.dataset.s1Id);
+                        const s2Id = Number(trackHitEl.dataset.s2Id);
+                        VisualEditorTools.openNewStationModal(svgPt.x, svgPt.y, lineCode, { s1Id, s2Id });
+                    } else {
+                        VisualEditorTools.openNewStationModal(svgPt.x, svgPt.y);
+                    }
                     return;
                 }
 
@@ -4428,13 +4555,15 @@
             document.getElementById("editLineRadius").value = ln.min_curve_radius_m;
             document.getElementById("editLineNote").value = ln.status_note || "";
 
-            NetworkStore.draftRouteStops = ln.stops.map(s => {
+            const sortedStops = [...(ln.stops || [])].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+            NetworkStore.draftRouteStops = sortedStops.map((s, idx) => {
                 const stObj = NetworkStore.stationsById.get(s.station_id);
                 const isTerm = Array.isArray(stObj?.terminal_lines) && stObj.terminal_lines.includes(ln.code);
                 return {
                     id: s.id,
                     station_id: s.station_id,
                     station_name: s.station_name,
+                    sequence: idx,
                     branch: s.branch || "main",
                     segment_infrastructure: s.segment_infrastructure,
                     segment_status: s.segment_status,
@@ -5317,7 +5446,16 @@
                         [stops[idx - 1], stops[idx]] = [stops[idx], stops[idx - 1]];
                         stops[idx - 1].waypoints = [];
                         stops[idx].waypoints = [];
+                        stops.forEach((s, i) => { s.sequence = i; });
+                        const lineCode = document.getElementById("editLineSelect")?.value;
+                        const ln = NetworkStore.linesByCode.get(lineCode);
+                        if (ln) {
+                            ln.stops = [...stops];
+                            ln.is_custom_modified = true;
+                        }
                         this.renderLineRouteEditor();
+                        SchematicMapEngine.renderTracksAndStations();
+                        if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                     }
                 } else if (downBtn) {
                     const idx = Number(downBtn.dataset.idx);
@@ -5325,7 +5463,16 @@
                         [stops[idx + 1], stops[idx]] = [stops[idx], stops[idx + 1]];
                         stops[idx + 1].waypoints = [];
                         stops[idx].waypoints = [];
+                        stops.forEach((s, i) => { s.sequence = i; });
+                        const lineCode = document.getElementById("editLineSelect")?.value;
+                        const ln = NetworkStore.linesByCode.get(lineCode);
+                        if (ln) {
+                            ln.stops = [...stops];
+                            ln.is_custom_modified = true;
+                        }
                         this.renderLineRouteEditor();
+                        SchematicMapEngine.renderTracksAndStations();
+                        if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
                     }
                 } else if (rmBtn) {
                     if (stops.length <= 2) {
@@ -5333,9 +5480,39 @@
                         return;
                     }
                     const idx = Number(rmBtn.dataset.idx);
+                    const removedStop = stops[idx];
                     if (idx > 0 && stops[idx - 1]) stops[idx - 1].waypoints = [];
                     stops.splice(idx, 1);
+                    stops.forEach((s, i) => { s.sequence = i; });
+
+                    const lineCode = document.getElementById("editLineSelect")?.value;
+                    const ln = NetworkStore.linesByCode.get(lineCode);
+                    if (ln) {
+                        ln.stops = [...stops];
+                        ln.declared_stations_count = ln.stops.length;
+                        ln.is_custom_modified = true;
+                    }
+
+                    if (removedStop) {
+                        const hasOtherStops = stops.some(s => s.station_id === removedStop.station_id);
+                        if (!hasOtherStops) {
+                            const st = NetworkStore.stationsById.get(removedStop.station_id);
+                            if (st) {
+                                st.lines = (st.lines || []).filter(c => String(c).trim().toUpperCase() !== String(lineCode).trim().toUpperCase());
+                                st.is_transfer = st.lines.length > 1;
+                                if (Array.isArray(st.terminal_lines)) {
+                                    st.terminal_lines = st.terminal_lines.filter(c => String(c).trim().toUpperCase() !== String(lineCode).trim().toUpperCase());
+                                    st.is_terminal = st.terminal_lines.length > 0;
+                                }
+                                st.is_custom_modified = true;
+                            }
+                        }
+                    }
+
                     this.renderLineRouteEditor();
+                    SchematicMapEngine.renderTracksAndStations();
+                    if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
+                    showToast(`Estación "${removedStop?.station_name || 'Parada'}" quitada de Línea ${lineCode}`);
                 }
             });
 
@@ -5565,6 +5742,18 @@
                 const infra = document.getElementById("newStationInfra").value;
                 const status = document.getElementById("newStationStatus").value;
                 const initLine = document.getElementById("newStationInitialLine").value;
+                const s1Val = document.getElementById("newStationInsertS1")?.value;
+                const s2Val = document.getElementById("newStationInsertS2")?.value;
+                let s1Id = s1Val ? Number(s1Val) : null;
+                let s2Id = s2Val ? Number(s2Val) : null;
+
+                if (!s1Id && !s2Id && initLine) {
+                    const detected = findBestSegmentForPoint(initLine, x, y);
+                    if (detected) {
+                        s1Id = detected.s1Id;
+                        s2Id = detected.s2Id;
+                    }
+                }
 
                 const payload = {
                     name,
@@ -5572,7 +5761,11 @@
                     y,
                     infrastructure_type: infra || "subterraneo",
                     operational_status: status || "operational",
-                    lines: initLine ? [initLine] : []
+                    lines: initLine ? [initLine] : [],
+                    initial_line: initLine || null,
+                    line_code: initLine || null,
+                    s1_id: s1Id,
+                    s2_id: s2Id
                 };
 
                 try {

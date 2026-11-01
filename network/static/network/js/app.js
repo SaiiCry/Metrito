@@ -212,65 +212,86 @@
     };
 
     function renderCorrespondenceLinesChecklist(checklistEl, selectEl, availableLines, remainingQuota) {
-        if (!checklistEl) return;
-        if (availableLines.length === 0) {
-            checklistEl.innerHTML = `<div style="font-size:11.5px; color:#64748b; font-style:italic; padding:6px;">La estación ya pertenece a todas las líneas del sistema.</div>`;
-            if (selectEl) {
-                selectEl.innerHTML = "";
-                selectEl.disabled = true;
-            }
-            return;
-        }
+        const lines = Array.isArray(availableLines) ? availableLines : [];
 
-        if (remainingQuota <= 0) {
-            checklistEl.innerHTML = `<div style="font-size:11.5px; color:#b91c1c; font-weight:600; padding:6px; background:#fef2f2; border-radius:4px;">⚠️ Límite alcanzado: Esta estación ya tiene el máximo permitido de 10 correspondencias. Desconecta alguna línea si deseas asociar otra.</div>`;
-            if (selectEl) {
-                selectEl.innerHTML = "";
-                selectEl.disabled = true;
-            }
-            return;
-        }
-
+        // 1. POBLAR SELECT DESPLEGABLE (Selector individual clásico y directo)
         if (selectEl) {
-            selectEl.disabled = false;
-            selectEl.innerHTML = availableLines.map(l =>
-                `<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
-            ).join("");
+            if (remainingQuota <= 0) {
+                selectEl.disabled = true;
+                selectEl.innerHTML = '<option value="">(Límite de 10 correspondencias alcanzado)</option>';
+            } else if (lines.length === 0) {
+                selectEl.disabled = true;
+                selectEl.innerHTML = '<option value="">(La estación ya pertenece a todas las líneas)</option>';
+            } else {
+                selectEl.disabled = false;
+                const options = ['<option value="">-- Selecciona una línea destino --</option>'];
+                for (const l of lines) {
+                    options.push(`<option value="${escapeHtml(l.code)}">Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`);
+                }
+                selectEl.innerHTML = options.join("");
+            }
+
+            // Sincronización bidireccional: al elegir en el select, sincronizar casilla si existe checklist
+            if (!selectEl.dataset.boundCorrSync) {
+                selectEl.dataset.boundCorrSync = "true";
+                selectEl.addEventListener("change", (e) => {
+                    const val = e.target.value;
+                    const hostChecklist = selectEl.id === "corrTargetLineSelect"
+                        ? document.getElementById("corrTargetLinesChecklist")
+                        : document.getElementById("modalCorrLinesChecklist");
+                    if (hostChecklist) {
+                        const cbs = hostChecklist.querySelectorAll(".js-corr-line-checkbox");
+                        cbs.forEach(cb => {
+                            cb.checked = Boolean(val && cb.value === val);
+                        });
+                    }
+                });
+            }
         }
 
-        checklistEl.innerHTML = availableLines.map(l => {
-            const bg = l.color || "#0052ff";
-            const fg = typeof getBadgeTextColor === "function" ? getBadgeTextColor(bg, "#FFFFFF") : "#FFFFFF";
-            return `
-                <label class="corr-line-checkbox-item" style="display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:4px; cursor:pointer; font-size:12px; user-select:none;">
-                    <input type="checkbox" class="js-corr-line-checkbox" value="${escapeHtml(l.code)}" style="cursor:pointer; accent-color:var(--primary, #0052ff);">
-                    <span style="background:${bg}; color:${fg}; font-weight:700; font-size:10px; padding:1px 6px; border-radius:3px; min-width:22px; text-align:center;">
-                        ${escapeHtml(l.code)}
-                    </span>
-                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1e293b; font-weight:500;">
-                        ${escapeHtml(l.name)}
-                    </span>
-                </label>
-            `;
-        }).join("");
+        // 2. POBLAR CHECKLIST DE SELECCIÓN MÚLTIPLE (Opcional, hasta remainingQuota líneas)
+        if (checklistEl) {
+            if (remainingQuota <= 0) {
+                checklistEl.innerHTML = `<div style="font-size:11.5px; color:#b91c1c; font-weight:600; padding:6px; background:#fef2f2; border-radius:4px;">⚠️ Límite alcanzado: Esta estación ya tiene el máximo permitido de 10 correspondencias. Desconecta alguna línea si deseas asociar otra.</div>`;
+            } else if (lines.length === 0) {
+                checklistEl.innerHTML = `<div style="font-size:11.5px; color:#64748b; font-style:italic; padding:6px;">La estación ya pertenece a todas las líneas del sistema.</div>`;
+            } else {
+                checklistEl.innerHTML = lines.map(l => {
+                    const bg = l.color || "#0052ff";
+                    const fg = typeof getBadgeTextColor === "function" ? getBadgeTextColor(bg, "#FFFFFF") : "#FFFFFF";
+                    return `
+                        <label class="corr-line-checkbox-item" style="display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:4px; cursor:pointer; font-size:12px; user-select:none;">
+                            <input type="checkbox" class="js-corr-line-checkbox" value="${escapeHtml(l.code)}" style="cursor:pointer; accent-color:var(--primary, #0052ff);">
+                            <span style="background:${bg}; color:${fg}; font-weight:700; font-size:10px; padding:1px 6px; border-radius:3px; min-width:22px; text-align:center;">
+                                ${escapeHtml(l.code)}
+                            </span>
+                            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1e293b; font-weight:500;">
+                                ${escapeHtml(l.name)}
+                            </span>
+                        </label>
+                    `;
+                }).join("");
 
-        const checkboxes = checklistEl.querySelectorAll(".js-corr-line-checkbox");
-        checkboxes.forEach(cb => {
-            cb.addEventListener("change", (e) => {
-                const checked = Array.from(checkboxes).filter(c => c.checked);
-                if (checked.length > remainingQuota) {
-                    e.target.checked = false;
-                    showToast(`Máximo 10 correspondencias por estación (solo puedes seleccionar hasta ${remainingQuota} en esta estación).`);
-                    return;
-                }
-                if (selectEl) {
-                    const checkedValues = new Set(Array.from(checkboxes).filter(c => c.checked).map(c => c.value));
-                    Array.from(selectEl.options).forEach(opt => {
-                        opt.selected = checkedValues.has(opt.value);
+                const checkboxes = checklistEl.querySelectorAll(".js-corr-line-checkbox");
+                checkboxes.forEach(cb => {
+                    cb.addEventListener("change", (e) => {
+                        const checked = Array.from(checkboxes).filter(c => c.checked);
+                        if (checked.length > remainingQuota) {
+                            e.target.checked = false;
+                            showToast(`Máximo 10 correspondencias por estación (solo puedes seleccionar hasta ${remainingQuota} en esta estación).`);
+                            return;
+                        }
+                        if (selectEl) {
+                            if (checked.length === 1) {
+                                selectEl.value = checked[0].value;
+                            } else {
+                                selectEl.value = "";
+                            }
+                        }
                     });
-                }
-            });
-        });
+                });
+            }
+        }
     }
 
     // =========================================================================
@@ -487,10 +508,12 @@
                         }
                     });
                     if (selLine) {
-                        const checkedValues = new Set(cbs.filter(c => c.checked).map(c => c.value));
-                        Array.from(selLine.options).forEach(opt => {
-                            opt.selected = checkedValues.has(opt.value);
-                        });
+                        const checked = cbs.filter(c => c.checked);
+                        if (checked.length === 1) {
+                            selLine.value = checked[0].value;
+                        } else {
+                            selLine.value = "";
+                        }
                     }
                 });
             }
@@ -502,7 +525,7 @@
                     const cbs = checklist ? checklist.querySelectorAll(".js-corr-line-checkbox") : [];
                     cbs.forEach(cb => { cb.checked = false; });
                     if (selLine) {
-                        Array.from(selLine.options).forEach(opt => { opt.selected = false; });
+                        selLine.value = "";
                     }
                 });
             }
@@ -4758,10 +4781,12 @@
                         }
                     });
                     if (selLine) {
-                        const checkedValues = new Set(cbs.filter(c => c.checked).map(c => c.value));
-                        Array.from(selLine.options).forEach(opt => {
-                            opt.selected = checkedValues.has(opt.value);
-                        });
+                        const checked = cbs.filter(c => c.checked);
+                        if (checked.length === 1) {
+                            selLine.value = checked[0].value;
+                        } else {
+                            selLine.value = "";
+                        }
                     }
                 });
             }
@@ -4773,7 +4798,7 @@
                     const cbs = checklist ? checklist.querySelectorAll(".js-corr-line-checkbox") : [];
                     cbs.forEach(cb => { cb.checked = false; });
                     if (selLine) {
-                        Array.from(selLine.options).forEach(opt => { opt.selected = false; });
+                        selLine.value = "";
                     }
                 });
             }
@@ -4799,9 +4824,10 @@
 
             const sorted = NetworkStore.getSortedStations();
             if (selStation) {
-                selStation.innerHTML = sorted.map(s =>
-                    `<option value="${s.id}">${escapeHtml(s.name)}</option>`
-                ).join("");
+                selStation.innerHTML = sorted.map(s => {
+                    const lList = Array.isArray(s.lines) && s.lines.length > 0 ? ` (Líneas: ${s.lines.join("/")})` : "";
+                    return `<option value="${s.id}">${escapeHtml(s.name)}${escapeHtml(lList)}</option>`;
+                }).join("");
 
                 const initialId = NetworkStore.selectedStationId || (sorted.length > 0 ? sorted[0].id : null);
                 if (initialId) {
@@ -4811,7 +4837,7 @@
 
                 if (!selStation.dataset.boundChange) {
                     selStation.dataset.boundChange = "true";
-                    selStation.addEventListener("change", (e) => {
+                    const handleStationChange = (e) => {
                         const stId = Number(e.target.value);
                         if (stId) {
                             NetworkStore.selectedStationId = stId;
@@ -4820,7 +4846,9 @@
                             }
                             this.updateTargetLinesForStation(stId);
                         }
-                    });
+                    };
+                    selStation.addEventListener("change", handleStationChange);
+                    selStation.addEventListener("input", handleStationChange);
                 }
             }
 

@@ -404,3 +404,88 @@ describe("Enderezado de Trazos Derecho a 90° o 180° según Orientación", () =
         assert.deepEqual(wps, []);
     });
 });
+
+describe("Renderizador de Selectores de Línea Destino en Correspondencias", () => {
+    function mockRenderCorrespondenceLinesChecklist(checklistEl, selectEl, availableLines, remainingQuota) {
+        const lines = Array.isArray(availableLines) ? availableLines : [];
+
+        if (selectEl) {
+            if (remainingQuota <= 0) {
+                selectEl.disabled = true;
+                selectEl.innerHTML = '<option value="">(Límite de 10 correspondencias alcanzado)</option>';
+            } else if (lines.length === 0) {
+                selectEl.disabled = true;
+                selectEl.innerHTML = '<option value="">(La estación ya pertenece a todas las líneas)</option>';
+            } else {
+                selectEl.disabled = false;
+                const options = ['<option value="">-- Selecciona una línea destino --</option>'];
+                for (const l of lines) {
+                    options.push(`<option value="${l.code}">Línea ${l.code} · ${l.name}</option>`);
+                }
+                selectEl.innerHTML = options.join("");
+            }
+        }
+
+        if (checklistEl) {
+            if (remainingQuota <= 0) {
+                checklistEl.innerHTML = `<div>Límite alcanzado</div>`;
+            } else if (lines.length === 0) {
+                checklistEl.innerHTML = `<div>Pertenece a todas las líneas</div>`;
+            } else {
+                checklistEl.innerHTML = lines.map(l =>
+                    `<input type="checkbox" class="js-corr-line-checkbox" value="${l.code}">${l.name}`
+                ).join("");
+            }
+        }
+    }
+
+    it("puebla selectEl independientemente incluso cuando checklistEl es null", () => {
+        const mockSelect = { disabled: false, innerHTML: "" };
+        const availableLines = [
+            { code: "2", name: "Tasqueña - Cuatro Caminos" },
+            { code: "3", name: "Indios Verdes - Universidad" }
+        ];
+
+        mockRenderCorrespondenceLinesChecklist(null, mockSelect, availableLines, 8);
+
+        assert.equal(mockSelect.disabled, false);
+        assert.ok(mockSelect.innerHTML.includes("-- Selecciona una línea destino --"));
+        assert.ok(mockSelect.innerHTML.includes('value="2"'));
+        assert.ok(mockSelect.innerHTML.includes('value="3"'));
+    });
+
+    it("deshabilita selectEl cuando remainingQuota es 0 (máximo de 10 alcanzado)", () => {
+        const mockSelect = { disabled: false, innerHTML: "" };
+        const availableLines = [{ code: "2", name: "Línea 2" }];
+
+        mockRenderCorrespondenceLinesChecklist(null, mockSelect, availableLines, 0);
+
+        assert.equal(mockSelect.disabled, true);
+        assert.ok(mockSelect.innerHTML.includes("Límite de 10 correspondencias alcanzado"));
+    });
+
+    it("deshabilita selectEl cuando la estación ya pertenece a todas las líneas", () => {
+        const mockSelect = { disabled: false, innerHTML: "" };
+
+        mockRenderCorrespondenceLinesChecklist(null, mockSelect, [], 5);
+
+        assert.equal(mockSelect.disabled, true);
+        assert.ok(mockSelect.innerHTML.includes("ya pertenece a todas las líneas"));
+    });
+
+    it("puebla tanto selectEl como checklistEl de forma desacoplada y simultánea", () => {
+        const mockSelect = { disabled: false, innerHTML: "" };
+        const mockChecklist = { innerHTML: "" };
+        const availableLines = [
+            { code: "1", name: "Observatorio - Pantitlán" },
+            { code: "S3", name: "Ruta Sur Directa" }
+        ];
+
+        mockRenderCorrespondenceLinesChecklist(mockChecklist, mockSelect, availableLines, 8);
+
+        assert.ok(mockSelect.innerHTML.includes('value="1"'));
+        assert.ok(mockSelect.innerHTML.includes('value="S3"'));
+        assert.ok(mockChecklist.innerHTML.includes('value="1"'));
+        assert.ok(mockChecklist.innerHTML.includes('value="S3"'));
+    });
+});

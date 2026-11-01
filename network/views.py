@@ -1274,15 +1274,25 @@ def api_create_line_segment(request):
     st1_lines = set(LineStation.objects.filter(station=st1).values_list("line_id", flat=True))
     st2_lines = set(LineStation.objects.filter(station=st2).values_list("line_id", flat=True))
 
-    if st1_lines and line.id not in st1_lines:
-        return JsonResponse({
-            "error": f"La estación '{st1.name}' pertenece a otra línea y no a la Línea {line.code}. Para conectarla, incorpórala primero como correspondencia."
-        }, status=400)
+    auto_correspondence = payload.get("auto_correspondence", False)
+    if not auto_correspondence:
+        if st1_lines and line.id not in st1_lines:
+            return JsonResponse({
+                "error": f"La estación '{st1.name}' pertenece a otra línea y no a la Línea {line.code}. Para conectarla, incorpórala primero como correspondencia."
+            }, status=400)
 
-    if st2_lines and line.id not in st2_lines:
-        return JsonResponse({
-            "error": f"La estación '{st2.name}' pertenece a otra línea y no a la Línea {line.code}. Para conectarla, incorpórala primero como correspondencia."
-        }, status=400)
+        if st2_lines and line.id not in st2_lines:
+            return JsonResponse({
+                "error": f"La estación '{st2.name}' pertenece a otra línea y no a la Línea {line.code}. Para conectarla, incorpórala primero como correspondencia."
+            }, status=400)
+    else:
+        # En modo trazado directo interactivo estilo MetroMapMaker, incorporar automáticamente a la línea como correspondencia
+        if st1_lines and line.id not in st1_lines:
+            st1.is_transfer = True
+            st1.save(update_fields=["is_transfer"])
+        if st2_lines and line.id not in st2_lines:
+            st2.is_transfer = True
+            st2.save(update_fields=["is_transfer"])
 
     # Validar duplicados en la línea: verificar si ya existe un tramo directo contiguo entre st1 y st2 en la misma rama
     branches_stops = {}

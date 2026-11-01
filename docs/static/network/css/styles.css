@@ -2297,3 +2297,48 @@ body.tool-active-add_correspondence #metroSchematicSvg {
     background: #10b981;
     box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
 }
+
+/* Estilos interactivos estilo MetroMapMaker para trazado directo de líneas */
+.svg-rubber-band-line {
+    pointer-events: none;
+    transition: stroke 0.15s ease;
+}
+
+.svg-rubber-band-pulse {
+    pointer-events: none;
+    animation: rubberPulse 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes rubberPulse {
+    from { stroke-width: 3.5px; opacity: 0.7; }
+    to { stroke-width: 6.5px; opacity: 1; }
+}
+
+.svg-station-node.connect-target-hover {
+    stroke: #10B981 !important;
+    stroke-width: 5px !important;
+    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.85));
+    transition: all 0.15s ease;
+}
+
+.svg-waypoint-handle {
+    cursor: grab;
+    transition: r 0.15s ease, stroke-width 0.15s ease;
+}
+
+.svg-waypoint-handle:hover {
+    r: 9px !important;
+    stroke-width: 3.5px !important;
+    cursor: grab;
+    filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.4));
+}
+
+.svg-waypoint-handle:active {
+    cursor: grabbing;
+}
+
+.ed-active-line-select:focus {
+    outline: none;
+    border-color: var(--primary, #0052ff);
+    box-shadow: 0 0 0 2px rgba(0, 82, 255, 0.2);
+}

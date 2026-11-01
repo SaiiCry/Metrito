@@ -535,3 +535,31 @@ class TestLineSegmentsAndWaypointsEndpoints:
         # segment_wps was calculated as [[2600.0, 1000.0]]
         assert len(ls_start.waypoints) == 1
         assert ls_start.waypoints[0] == [2600.0, 1000.0]
+
+    def test_create_segment_auto_correspondence_metromapmaker_mode(self, api_client, minimal_network):
+        """
+        En modo de trazado interactivo estilo MetroMapMaker (auto_correspondence=True),
+        unir dos estaciones de distintas líneas incorpora automáticamente la estación
+        y actualiza su estado de correspondencia sin rechazar con error 400.
+        """
+        line_1 = minimal_network["line_1"]
+        st_alfa = minimal_network["st_alfa"]
+        line_2 = minimal_network["line_2"]
+        st_delta = minimal_network["st_delta"]
+
+        resp = api_client.post(
+            "/api/line-segments/create/",
+            data=json.dumps({
+                "line_code": line_1.code,
+                "from_station_id": st_alfa.id,
+                "to_station_id": st_delta.id,
+                "auto_correspondence": True
+            }),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        st_delta.refresh_from_db()
+        assert st_delta.is_transfer is True
+        assert LineStation.objects.filter(line=line_1, station=st_delta).exists()

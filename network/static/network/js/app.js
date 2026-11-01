@@ -40,6 +40,7 @@
         editMode: false,
         trackWidthScale: 1.0,
         draftRouteStops: [],
+        activeLineCode: "1",
         selectedStationId: null,
         selectedTrainId: null,
         simSpeedMultiplier: 1,
@@ -93,6 +94,9 @@
             this.linesByCode.clear();
             for (const ln of this.lines) {
                 this.linesByCode.set(ln.code, ln);
+            }
+            if (this.lines.length > 0 && (!this.activeLineCode || !this.linesByCode.has(this.activeLineCode))) {
+                this.activeLineCode = this.lines[0].code;
             }
 
             this.stationsById.clear();
@@ -1019,6 +1023,47 @@
         correspondenceSourceStationId: null,
         pendingLineCaller: null, // 'station' | 'segment' | null
 
+        getActiveLineCode() {
+            return NetworkStore.activeLineCode ||
+                document.getElementById("edActiveLineSelect")?.value ||
+                document.getElementById("editLineSelect")?.value ||
+                (NetworkStore.lines[0] ? NetworkStore.lines[0].code : "1");
+        },
+
+        setActiveLine(code) {
+            if (!code) return;
+            NetworkStore.activeLineCode = String(code);
+            const sel = document.getElementById("edActiveLineSelect");
+            if (sel && sel.value !== code) sel.value = code;
+            const dot = document.getElementById("activeLineBadgeDot");
+            const ln = NetworkStore.linesByCode.get(String(code));
+            if (dot && ln) dot.style.background = ln.color || "#0055A4";
+            if (NetworkStore.editMode) {
+                SchematicMapEngine.renderEditHandles();
+            }
+        },
+
+        initActiveLinePicker() {
+            const sel = document.getElementById("edActiveLineSelect");
+            if (!sel) return;
+            sel.innerHTML = NetworkStore.lines.map(l =>
+                `<option value="${escapeHtml(l.code)}" ${this.getActiveLineCode() === l.code ? "selected" : ""}>Línea ${escapeHtml(l.code)} · ${escapeHtml(l.name)}</option>`
+            ).join("");
+            const activeCode = this.getActiveLineCode();
+            sel.value = activeCode;
+            const dot = document.getElementById("activeLineBadgeDot");
+            const curLn = NetworkStore.linesByCode.get(activeCode);
+            if (dot && curLn) dot.style.background = curLn.color || "#0055A4";
+
+            if (!sel._hasLinePickerSync) {
+                sel._hasLinePickerSync = true;
+                sel.addEventListener("change", (e) => {
+                    this.setActiveLine(e.target.value);
+                    showToast(`Línea activa para trazar: Línea ${e.target.value}`);
+                });
+            }
+        },
+
         setTool(tool) {
             if (this.activeTool === tool) {
                 this.cancel();
@@ -1030,8 +1075,8 @@
 
             document.body.classList.remove("tool-active-add_station", "tool-active-connect_segment", "tool-active-add_correspondence");
             document.querySelectorAll(".ed-tool-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".svg-station-node.connect-source, .svg-station-node.corr-source-pulse").forEach(el => {
-                el.classList.remove("connect-source", "corr-source-pulse");
+            document.querySelectorAll(".svg-station-node.connect-source, .svg-station-node.corr-source-pulse, .svg-station-node.connect-target-hover").forEach(el => {
+                el.classList.remove("connect-source", "corr-source-pulse", "connect-target-hover");
             });
 
             const statusBox = document.getElementById("edToolActiveStatus");
@@ -1047,15 +1092,19 @@
             } else if (tool === "connect_segment") {
                 document.body.classList.add("tool-active-connect_segment");
                 document.getElementById("btnToolAddSegment")?.classList.add("active");
+                const lineCode = this.getActiveLineCode();
+                const ln = NetworkStore.linesByCode.get(lineCode);
+                const lineName = ln ? `Línea ${ln.code}` : "Línea activa";
                 if (statusBox && statusText) {
-                    statusText.textContent = "Paso 1: Haz clic en la primera estación a conectar";
+                    statusText.textContent = `Modo Trazado (${lineName}): Clic en una estación o lienzo para iniciar el trazo.`;
                     statusBox.classList.remove("hidden");
                 }
+                showToast(`Modo Trazado activo para ${lineName}. Haz clic en estaciones o el mapa para unir.`);
             } else if (tool === "add_correspondence") {
                 document.body.classList.add("tool-active-add_correspondence");
                 document.getElementById("btnToolAddCorrespondence")?.classList.add("active");
                 if (statusBox && statusText) {
-                    statusText.textContent = "Haz clic en la 1ra estación para conectar correspondencia manualmente en el plano";
+                    statusText.textContent = "Haz clic en la 1ra estación para conectar correspondencia directamente en el plano";
                     statusBox.classList.remove("hidden");
                 }
             }
@@ -1067,10 +1116,11 @@
             this.correspondenceSourceStationId = null;
             document.body.classList.remove("tool-active-add_station", "tool-active-connect_segment", "tool-active-add_correspondence");
             document.querySelectorAll(".ed-tool-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".svg-station-node.connect-source, .svg-station-node.corr-source-pulse").forEach(el => {
-                el.classList.remove("connect-source", "corr-source-pulse");
+            document.querySelectorAll(".svg-station-node.connect-source, .svg-station-node.corr-source-pulse, .svg-station-node.connect-target-hover").forEach(el => {
+                el.classList.remove("connect-source", "corr-source-pulse", "connect-target-hover");
             });
             document.getElementById("edToolActiveStatus")?.classList.add("hidden");
+            SchematicMapEngine.renderRubberBand(null);
         },
 
         openNewStationModal(x = null, y = null, initialLine = null) {
@@ -1299,21 +1349,112 @@
 
             if (this.segmentSourceStationId === null) {
                 this.segmentSourceStationId = stId;
+                document.querySelectorAll(".svg-station-node.connect-source").forEach(el => el.classList.remove("connect-source"));
                 const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${stId}"]`);
                 if (nodeEl) nodeEl.classList.add("connect-source");
+                const lineCode = this.getActiveLineCode();
                 const statusText = document.getElementById("edToolActiveText");
                 if (statusText) {
-                    statusText.textContent = `Origen: ${st.name}. Ahora haz clic en la estación destino.`;
+                    statusText.textContent = `Origen: ${st.name} (Línea ${lineCode}). Clic en la siguiente estación o lienzo para unir. (Esc: terminar)`;
                 }
+                showToast(`Origen fijado en ${st.name}. Clic en el siguiente punto para unir en Línea ${lineCode}.`);
             } else {
                 const fromId = this.segmentSourceStationId;
                 const toId = stId;
                 if (fromId === toId) {
-                    showToast("Selecciona una estación destino diferente");
+                    showToast("Haz clic en otra estación o en el mapa para trazar.");
                     return;
                 }
-                this.cancel();
-                this.openNewSegmentModal(fromId, toId);
+                this.connectStationsDirectly(fromId, toId);
+            }
+        },
+
+        async connectStationsDirectly(fromId, toId) {
+            const lineCode = this.getActiveLineCode();
+            const st1 = NetworkStore.stationsById.get(fromId);
+            const st2 = NetworkStore.stationsById.get(toId);
+            if (!st1 || !st2) return;
+
+            try {
+                const res = await ApiClient.post("/api/line-segments/create/", {
+                    line_code: lineCode,
+                    from_station_id: fromId,
+                    to_station_id: toId,
+                    auto_correspondence: true
+                });
+
+                if (!res.ok) {
+                    showToast(res.error || "No se pudo conectar el tramo");
+                    return;
+                }
+
+                if (!st1.lines.includes(lineCode)) st1.lines.push(lineCode);
+                if (!st2.lines.includes(lineCode)) st2.lines.push(lineCode);
+                st1.is_transfer = st1.lines.length > 1;
+                st2.is_transfer = st2.lines.length > 1;
+
+                await refreshNetworkDataAndRender();
+
+                HistoryManager.push({
+                    type: "segment_create",
+                    lineCode,
+                    fromId,
+                    toId,
+                    description: `Unir ${st1.name} ↔ ${st2.name} en Línea ${lineCode}`
+                });
+
+                showToast(`✓ Conectado: ${st1.name} ↔ ${st2.name} en Línea ${lineCode}`);
+
+                // Continuidad fluida estilo MetroMapMaker: toId se convierte en el nuevo origen para encadenar trazos
+                this.segmentSourceStationId = toId;
+                document.querySelectorAll(".svg-station-node.connect-source").forEach(el => el.classList.remove("connect-source"));
+                const nextNodeEl = document.querySelector(`.svg-station-node[data-station-id="${toId}"]`);
+                if (nextNodeEl) nextNodeEl.classList.add("connect-source");
+
+                const statusText = document.getElementById("edToolActiveText");
+                if (statusText) {
+                    statusText.textContent = `Extremo actual: ${st2.name} (Línea ${lineCode}). Continúa haciendo clic para extender el trazo.`;
+                }
+                SchematicMapEngine.renderRubberBand(null);
+            } catch (err) {
+                console.error("Error al conectar tramo directo:", err);
+                showToast("Error al conectar estaciones");
+            }
+        },
+
+        async createAndConnectNewStation(x, y) {
+            const lineCode = this.getActiveLineCode();
+            try {
+                const newName = `Estación ${NetworkStore.stations.length + 1}`;
+                const res = await ApiClient.post("/api/stations/create/", {
+                    name: newName,
+                    x: Math.round(x * 2) / 2,
+                    y: Math.round(y * 2) / 2,
+                    initial_line: lineCode,
+                    infrastructure_type: "subterraneo",
+                    operational_status: "operational",
+                    platforms_count: 2
+                });
+
+                if (!res.ok) {
+                    showToast(res.error || "Error creando estación");
+                    return;
+                }
+
+                const newStId = res.created_id || (res.station ? res.station.id : null);
+                await refreshNetworkDataAndRender();
+
+                if (this.segmentSourceStationId !== null && newStId) {
+                    await this.connectStationsDirectly(this.segmentSourceStationId, newStId);
+                } else if (newStId) {
+                    this.segmentSourceStationId = newStId;
+                    const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${newStId}"]`);
+                    if (nodeEl) nodeEl.classList.add("connect-source");
+                    showToast(`Estación ${newName} creada. Haz clic en el siguiente punto para unir.`);
+                }
+            } catch (err) {
+                console.error("Error creando estación al trazar:", err);
+                showToast("Error al trazar nuevo punto");
             }
         },
 
@@ -2888,29 +3029,89 @@
                 });
             }
 
-            // 2. Vértices de los trazos (waypoints): ocultos para conservar la estética limpia estilo Seoul Metro Map
-            if (NetworkStore.showWaypointHandles) {
-                for (const line of NetworkStore.lines) {
-                    if (!this.isLineVisible(line)) continue;
-                    for (const stop of line.stops) {
-                        if (!this.isSegmentMatchingInfraFilter(stop)) continue;
-                        const wps = Array.isArray(stop.waypoints) ? stop.waypoints : [];
-                        wps.forEach((pt, wpIdx) => {
-                            html += `
-                                <circle class="svg-waypoint-handle"
-                                    data-line-code="${escapeHtml(line.code)}"
-                                    data-ls-id="${stop.id}"
-                                    data-wp-idx="${wpIdx}"
-                                    cx="${pt[0]}" cy="${pt[1]}" r="6.8"
-                                    fill="${line.color}" stroke="#FFFFFF" stroke-width="2.4">
-                                    <title>Trazo ${escapeHtml(line.name)} (Arrastra para acomodar · Clic derecho o doble clic para eliminar)</title>
-                                </circle>
-                            `;
-                        });
-                    }
+            // 2. Vértices de los trazos (waypoints): Visibles en Modo Edición para manipular a conveniencia
+            const activeLineCode = VisualEditorTools.getActiveLineCode();
+            for (const line of NetworkStore.lines) {
+                if (!this.isLineVisible(line)) continue;
+                const isActiveLine = line.code === activeLineCode;
+                for (const stop of (line.stops || [])) {
+                    if (!this.isSegmentMatchingInfraFilter(stop)) continue;
+                    const wps = Array.isArray(stop.waypoints) ? stop.waypoints : [];
+                    wps.forEach((pt, wpIdx) => {
+                        const r = isActiveLine ? 8.0 : 6.4;
+                        const strokeW = isActiveLine ? 2.8 : 2.0;
+                        html += `
+                            <circle class="svg-waypoint-handle"
+                                data-line-code="${escapeHtml(line.code)}"
+                                data-ls-id="${stop.id}"
+                                data-wp-idx="${wpIdx}"
+                                cx="${pt[0]}" cy="${pt[1]}" r="${r}"
+                                fill="${line.color}" stroke="#FFFFFF" stroke-width="${strokeW}">
+                                <title>Vértice Línea ${escapeHtml(line.name)} (Arrastra para moldear a 45°/90° · Clic derecho o doble clic para eliminar)</title>
+                            </circle>
+                        `;
+                    });
                 }
             }
             g.innerHTML = html;
+        },
+
+        renderRubberBand(mouseSvgPt = null) {
+            const g = document.getElementById("svgLayerRubberBand");
+            if (!g) return;
+
+            if (VisualEditorTools.activeTool !== "connect_segment" || !VisualEditorTools.segmentSourceStationId || !mouseSvgPt) {
+                g.innerHTML = "";
+                document.querySelectorAll(".svg-station-node.connect-target-hover").forEach(el => el.classList.remove("connect-target-hover"));
+                return;
+            }
+
+            const st1 = NetworkStore.stationsById.get(VisualEditorTools.segmentSourceStationId);
+            if (!st1) {
+                g.innerHTML = "";
+                return;
+            }
+
+            // Detectar si está sobre una estación destino existente (snap a estación)
+            let snapTarget = null;
+            let hoveredStId = null;
+            let closestDist = 28.0;
+
+            for (const st of NetworkStore.stations) {
+                if (st.id === st1.id) continue;
+                const dist = Math.hypot(st.x - mouseSvgPt.x, st.y - mouseSvgPt.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    snapTarget = [st.x, st.y];
+                    hoveredStId = st.id;
+                }
+            }
+
+            document.querySelectorAll(".svg-station-node.connect-target-hover").forEach(el => el.classList.remove("connect-target-hover"));
+            if (hoveredStId) {
+                const hoveredEl = document.querySelector(`.svg-station-node[data-station-id="${hoveredStId}"]`);
+                if (hoveredEl) hoveredEl.classList.add("connect-target-hover");
+            }
+
+            if (!snapTarget) {
+                // Snap octilineal a 45°/90° respecto a st1
+                snapTarget = this.snapPointOctilinear([st1.x, st1.y], [mouseSvgPt.x, mouseSvgPt.y]);
+            }
+
+            const lineCode = VisualEditorTools.getActiveLineCode();
+            const ln = NetworkStore.linesByCode.get(lineCode);
+            const strokeColor = ln ? ln.color : "#0055A4";
+
+            g.innerHTML = `
+                <line x1="${st1.x}" y1="${st1.y}" x2="${snapTarget[0]}" y2="${snapTarget[1]}"
+                    stroke="${strokeColor}" stroke-width="8" opacity="0.25" stroke-linecap="round" />
+                <line class="svg-rubber-band-line"
+                    x1="${st1.x}" y1="${st1.y}" x2="${snapTarget[0]}" y2="${snapTarget[1]}"
+                    stroke="${strokeColor}" stroke-width="4.5" stroke-dasharray="8,5" stroke-linecap="round" />
+                <circle class="svg-rubber-band-point"
+                    cx="${snapTarget[0]}" cy="${snapTarget[1]}" r="6.5"
+                    fill="${strokeColor}" stroke="#FFFFFF" stroke-width="2.5" />
+            `;
         },
 
         bindInteractionEvents() {
@@ -2923,6 +3124,12 @@
 
             // Clic derecho o doble clic sobre un vértice del trazo para eliminarlo
             this.viewport.addEventListener("contextmenu", (e) => {
+                if (VisualEditorTools.activeTool === "connect_segment") {
+                    e.preventDefault();
+                    VisualEditorTools.cancel();
+                    showToast("Trazado finalizado");
+                    return;
+                }
                 if (!NetworkStore.editMode) return;
                 const wpEl = e.target.closest(".svg-waypoint-handle");
                 if (wpEl) {
@@ -2968,10 +3175,22 @@
                     return;
                 }
 
-                if (VisualEditorTools.activeTool === "connect_segment" && stEl && e.button === 0) {
+                if (VisualEditorTools.activeTool === "connect_segment" && e.button === 0) {
                     e.stopPropagation();
-                    const stId = Number(stEl.dataset.stationId);
-                    VisualEditorTools.handleStationClickForSegment(stId);
+                    if (stEl) {
+                        const stId = Number(stEl.dataset.stationId);
+                        VisualEditorTools.handleStationClickForSegment(stId);
+                        return;
+                    }
+                    // Clic en lienzo vacío en modo trazado: crea y conecta nuevo punto estilo MetroMapMaker
+                    const svgPt = this.clientToSvgCoords(e.clientX, e.clientY);
+                    if (VisualEditorTools.segmentSourceStationId !== null) {
+                        const st1 = NetworkStore.stationsById.get(VisualEditorTools.segmentSourceStationId);
+                        const snapped = st1 ? this.snapPointOctilinear([st1.x, st1.y], [svgPt.x, svgPt.y]) : [svgPt.x, svgPt.y];
+                        VisualEditorTools.createAndConnectNewStation(snapped[0], snapped[1]);
+                    } else {
+                        VisualEditorTools.createAndConnectNewStation(svgPt.x, svgPt.y);
+                    }
                     return;
                 }
 
@@ -3113,6 +3332,10 @@
                 const statusEl = document.getElementById("cursorCoordsDisplay");
                 if (statusEl) {
                     statusEl.textContent = `Lienzo: X ${Math.round(svgPt.x)} · Y ${Math.round(svgPt.y)} (54 u/km) | Geo: ${lat}° N, ${lng}° O`;
+                }
+
+                if (VisualEditorTools.activeTool === "connect_segment" && VisualEditorTools.segmentSourceStationId !== null) {
+                    this.renderRubberBand(svgPt);
                 }
 
                 if (this.dragTarget) {
@@ -5139,6 +5362,13 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
                 VisualEditorTools.cancel();
             });
 
+            // Botón Enderezar Línea Activa a 45°/90° (Snap Octilineal estilo MetroMapMaker)
+            document.getElementById("btnStraightenActiveLine")?.addEventListener("click", async () => {
+                const lineCode = VisualEditorTools.getActiveLineCode();
+                await this.straightenLineTracks(lineCode);
+                showToast(`✓ Trazos de Línea ${lineCode} enderezados y alineados a 45°/90°`);
+            });
+
             // Deshacer y Rehacer
             document.getElementById("btnEditorUndo")?.addEventListener("click", () => {
                 HistoryManager.undo();
@@ -5746,6 +5976,7 @@ Se desvinculará de todas las líneas y tramos conectados.`)) {
             SchematicMapEngine.renderAll();
             ControlCenterUI.init();
             ApiClient.initBadgeClickHandler();
+            VisualEditorTools.initActiveLinePicker();
             requestAnimationFrame((t) => TrainSimulationEngine.step(t));
         } catch (err) {
             console.error("Error inicializando SMyT:", err);

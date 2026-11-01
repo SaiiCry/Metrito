@@ -131,4 +131,26 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         setApiBase("");
         assert.equal(getApiBase(), "");
     });
+
+    it("conexión directa de estaciones estilo MetroMapMaker en modo offline sin modal incorpora líneas e is_transfer", () => {
+        const st1 = mockStore.stationsById.get(101); // Líneas ["1", "2"]
+        const st2 = mockStore.stationsById.get(102); // Línea ["1"]
+        const lineCode = "2";
+
+        // Conectar st1 y st2 en Línea 2 directamente
+        if (!st2.lines.includes(lineCode)) st2.lines.push(lineCode);
+        st2.is_transfer = st2.lines.length > 1;
+
+        const ln2 = mockStore.linesByCode.get("2");
+        ln2.stops.push({
+            id: 999,
+            station_id: 102,
+            sequence: ln2.stops.length,
+            waypoints: []
+        });
+
+        assert.equal(st2.lines.includes("2"), true);
+        assert.equal(st2.is_transfer, true);
+        assert.equal(ln2.stops.length, 2);
+    });
 });

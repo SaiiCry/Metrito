@@ -3819,6 +3819,13 @@
             const corridorsLayer = document.getElementById("svgLayerCorridors");
             if (!corridorsLayer) return;
 
+            const widthScale = NetworkStore.trackWidthScale || 1.0;
+            const casingW = (13.8 * widthScale).toFixed(1);
+            const fillW = (8.6 * widthScale).toFixed(1);
+            const walkwayW = (2.4 * widthScale).toFixed(1);
+            const dashStr = `${(4.2 * widthScale).toFixed(1)} ${(3.8 * widthScale).toFixed(1)}`;
+            const hitW = (Math.max(26.0, 13.8 * widthScale + 12.0)).toFixed(1);
+
             let html = "";
             for (const corridor of NetworkStore.transferCorridors) {
                 const s1Id = Number(corridor.station1_id || corridor.from_station_id || corridor.fromStationId);
@@ -3853,17 +3860,18 @@
                 html += `
                     <g class="svg-transfer-corridor" data-corridor-id="${corridor.id}" opacity="${opacity}">
                         <title>Pasillo de correspondencia: ${escapeHtml(st1.name)} ⇄ ${escapeHtml(st2.name)} (${distMeters}m · ~${walkMin} min)</title>
-                        <polyline class="corridor-casing" points="${ptsStr}" stroke-width="15.5" fill="none" />
-                        <polyline class="corridor-fill" points="${ptsStr}" stroke-width="10.0" fill="none" />
-                        <polyline class="corridor-walkway" points="${ptsStr}" stroke-width="2.2" fill="none" />
+                        <polyline class="corridor-casing" points="${ptsStr}" stroke="#475569" stroke-width="${casingW}" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                        <polyline class="corridor-fill" points="${ptsStr}" stroke="#1E293B" stroke-width="${fillW}" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                        <polyline class="corridor-walkway" points="${ptsStr}" stroke="#94A3B8" stroke-width="${walkwayW}" stroke-dasharray="${dashStr}" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                        <polyline class="corridor-hit-area" points="${ptsStr}" stroke="transparent" stroke-width="${hitW}" stroke-linecap="round" stroke-linejoin="round" fill="none" />
                         <g class="corridor-badge" transform="translate(${midX.toFixed(1)}, ${midY.toFixed(1)})">
-                            <rect x="-48" y="-9" width="96" height="18" rx="9" />
-                            <text x="0" y="0" dy="0.35em" text-anchor="middle">🚶 ${distMeters}m · ${walkMin}m</text>
+                            <rect x="-44" y="-11" width="88" height="22" rx="11" fill="#1A2232" fill-opacity="0.94" stroke="#475569" stroke-width="1.2" />
+                            <text x="0" y="0" dy="0.35em" text-anchor="middle" fill="#F1F5F9" font-size="10.5" font-weight="600" font-family="system-ui, sans-serif">🚶 ${distMeters}m · ${walkMin}m</text>
                         </g>
                         ${NetworkStore.editMode ? `
-                            <g class="corridor-delete-btn" data-action="delete-corridor" data-corridor-id="${corridor.id}" transform="translate(${(midX + 58).toFixed(1)}, ${midY.toFixed(1)})">
-                                <circle cx="0" cy="0" r="7.5" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5" />
-                                <text x="0" y="0" dy="0.35em" text-anchor="middle" fill="#FFFFFF" font-size="10" font-weight="bold">×</text>
+                            <g class="corridor-delete-btn" data-action="delete-corridor" data-corridor-id="${corridor.id}" transform="translate(${(midX + 54).toFixed(1)}, ${midY.toFixed(1)})">
+                                <circle cx="0" cy="0" r="8.5" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5" />
+                                <text x="0" y="0" dy="0.35em" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="bold">×</text>
                             </g>
                         ` : ''}
                     </g>
@@ -7105,7 +7113,7 @@
                 VisualEditorTools.cancel();
             });
 
-            // Clic en capa de pasillos de correspondencia para eliminar en modo edición
+            // Clic en capa de pasillos de correspondencia para eliminar o inspeccionar
             document.getElementById("svgLayerCorridors")?.addEventListener("click", async (e) => {
                 const delBtn = e.target.closest(".corridor-delete-btn");
                 if (delBtn) {
@@ -7118,6 +7126,18 @@
                         showToast("Pasillo de correspondencia eliminado");
                     }
                     return;
+                }
+
+                const corrEl = e.target.closest(".svg-transfer-corridor");
+                if (corrEl) {
+                    e.stopPropagation();
+                    const corrId = corrEl.dataset.corridorId;
+                    const corr = NetworkStore.transferCorridorsById.get(corrId);
+                    if (corr) {
+                        const s1Id = Number(corr.station1_id || corr.from_station_id);
+                        if (s1Id) ControlCenterUI.selectStation(s1Id);
+                        showToast(`🚶 Pasillo de correspondencia: ${corr.station1_name || 'Estación'} ⇄ ${corr.station2_name || 'Estación'} (${corr.distance_meters || 120}m · ~${corr.walking_minutes || 2} min)`);
+                    }
                 }
             });
 

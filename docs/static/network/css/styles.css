@@ -2446,22 +2446,114 @@ body.tool-active-add_correspondence #metroSchematicSvg {
     transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
-.svg-transfer-corridor:hover .corridor-casing {
-    stroke: var(--accent-primary, #0055A4);
-    filter: drop-shadow(0 0 6px rgba(0, 85, 164, 0.45));
+.corridor-casing {
+    stroke: #475569;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.2s ease, filter 0.2s ease;
 }
 
-.svg-transfer-corridor:hover .corridor-walkway {
-    stroke: var(--accent-primary, #0055A4);
+[data-theme="light"] .corridor-casing {
+    stroke: #94A3B8;
 }
 
+.corridor-fill {
+    stroke: #1E293B;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.2s ease;
+}
+
+[data-theme="light"] .corridor-fill {
+    stroke: #FFFFFF;
+}
+
+.corridor-walkway {
+    stroke: #94A3B8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 4.5 4;
+    transition: stroke 0.2s ease;
+}
+
+[data-theme="light"] .corridor-walkway {
+    stroke: #64748B;
+}
+
+.corridor-hit-area {
+    cursor: pointer;
+}
+
+.svg-transfer-corridor:hover .corridor-casing,
+.svg-transfer-corridor.selected .corridor-casing {
+    stroke: var(--accent-primary, #0a84ff);
+    filter: drop-shadow(0 0 8px rgba(10, 132, 255, 0.55));
+}
+
+.svg-transfer-corridor:hover .corridor-walkway,
+.svg-transfer-corridor.selected .corridor-walkway {
+    stroke: #60A5FA;
+}
+
+/* Placa informativa de pasillo: oculta por defecto para un trazo limpio, visible al interactuar */
 .svg-transfer-corridor .corridor-badge {
     cursor: pointer;
-    transition: transform 0.15s ease;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(2px);
+    transition: opacity 0.2s cubic-bezier(0.165, 0.84, 0.44, 1), transform 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
-.svg-transfer-corridor:hover .corridor-badge {
-    transform: scale(1.12);
+.corridor-badge rect {
+    fill: var(--bg-elevated, #1a2232);
+    fill-opacity: 0.94;
+    stroke: var(--border-strong, rgba(255, 255, 255, 0.2));
+    stroke-width: 1.2px;
+    filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
+}
+
+[data-theme="light"] .corridor-badge rect {
+    fill: #FFFFFF;
+    stroke: rgba(30, 41, 59, 0.25);
+}
+
+.corridor-badge text {
+    fill: var(--text-primary, #f1f5f9);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-family: var(--font-sans);
+    user-select: none;
+    pointer-events: none;
+}
+
+[data-theme="light"] .corridor-badge text {
+    fill: #1e293b;
+}
+
+.svg-transfer-corridor:hover .corridor-badge,
+.svg-transfer-corridor.selected .corridor-badge {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.corridor-delete-btn {
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.svg-transfer-corridor:hover .corridor-delete-btn,
+.svg-transfer-corridor.selected .corridor-delete-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.corridor-delete-btn:hover circle {
+    fill: #dc2626;
+    transform: scale(1.15);
 }
 
 body.tool-active-add_corridor #schematicViewport {

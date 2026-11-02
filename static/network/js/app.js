@@ -182,7 +182,10 @@
 
         getCorridorsForStation(stId) {
             const numId = Number(stId);
-            return this.transferCorridors.filter(c => Number(c.station1_id) === numId || Number(c.station2_id) === numId);
+            return this.transferCorridors.filter(c =>
+                Number(c.station1_id || c.from_station_id || c.fromStationId) === numId ||
+                Number(c.station2_id || c.to_station_id || c.toStationId) === numId
+            );
         },
 
         getSortedStations() {
@@ -536,6 +539,18 @@
             return localRes;
         },
 
+        async updateStation(stationId, payload) {
+            return this.post(`/api/stations/${stationId}/update/`, payload);
+        },
+
+        async createTransferCorridor(payload) {
+            return this.post("/api/corridors/create/", payload);
+        },
+
+        async deleteTransferCorridor(corridorId) {
+            return this.post("/api/corridors/delete/", { corridor_id: corridorId });
+        },
+
         applyLocalMutation(endpoint, payload, updateStorage = true) {
             const edits = this.getStoredEdits();
 
@@ -628,9 +643,12 @@
                                 id: corrId,
                                 station1_id: st1Id,
                                 station2_id: st2Id,
+                                from_station_id: st1Id,
+                                to_station_id: st2Id,
                                 station1_name: st1.name,
                                 station2_name: st2.name,
                                 distance_m: distM,
+                                distance_meters: distM,
                                 walking_minutes: Math.max(1, Math.round(distM / 75)),
                                 waypoints: []
                             };
@@ -1406,8 +1424,8 @@
             if (endpoint.includes("/corridors")) {
                 if (payload?.action === "delete" || endpoint.includes("/delete")) {
                     const corrId = payload?.corridor_id || payload?.id;
-                    const st1Id = Number(payload?.station_id || payload?.station_id_1);
-                    const st2Id = Number(payload?.station_id_2);
+                    const st1Id = Number(payload?.station_id || payload?.station_id_1 || payload?.station1_id || payload?.from_station_id || payload?.fromStationId);
+                    const st2Id = Number(payload?.station_id_2 || payload?.station2_id || payload?.to_station_id || payload?.toStationId);
                     const targetId = corrId || (st1Id && st2Id ? `corridor-${Math.min(st1Id, st2Id)}-${Math.max(st1Id, st2Id)}` : null);
                     if (targetId) {
                         edits.transferCorridors = (edits.transferCorridors || []).filter(c => c.id !== targetId);
@@ -1419,8 +1437,8 @@
                 }
 
                 // Crear pasillo
-                const st1Id = Number(payload.station_id || payload.station_id_1 || payload.station1_id);
-                const st2Id = Number(payload.station_id_2 || payload.station2_id);
+                const st1Id = Number(payload.station_id || payload.station_id_1 || payload.station1_id || payload.from_station_id || payload.fromStationId);
+                const st2Id = Number(payload.station_id_2 || payload.station2_id || payload.to_station_id || payload.toStationId);
                 const st1 = NetworkStore.stationsById.get(st1Id);
                 const st2 = NetworkStore.stationsById.get(st2Id);
                 if (!st1 || !st2) return { ok: false, error: "Estación(es) no encontrada(s)" };
@@ -1435,16 +1453,19 @@
                 st2.is_custom_modified = true;
 
                 const distPx = Math.hypot(st1.x - st2.x, st1.y - st2.y);
-                const distM = Math.max(30, Math.round(distPx * 18.5));
-                const corrId = `corridor-${Math.min(st1Id, st2Id)}-${Math.max(st1Id, st2Id)}`;
+                const distM = Number(payload.distance_meters || payload.distance_m) || Math.max(30, Math.round(distPx * 18.5));
+                const corrId = payload.id || `corridor-${Math.min(st1Id, st2Id)}-${Math.max(st1Id, st2Id)}`;
                 const corrObj = {
                     id: corrId,
                     station1_id: st1Id,
                     station2_id: st2Id,
+                    from_station_id: st1Id,
+                    to_station_id: st2Id,
                     station1_name: st1.name,
                     station2_name: st2.name,
                     distance_m: distM,
-                    walking_minutes: Math.max(1, Math.round(distM / 75)),
+                    distance_meters: distM,
+                    walking_minutes: Number(payload.walking_minutes) || Math.max(1, Math.round(distM / 75)),
                     waypoints: Array.isArray(payload.waypoints) ? payload.waypoints : []
                 };
 
@@ -2246,7 +2267,12 @@
 
         async establishManualCorrespondence(st1Id, st2Id, st1Name = "", st2Name = "") {
             try {
-                const res = await ApiClient.post("/api/correspondences/", { station_id: st1Id, station_id_2: st2Id });
+                const res = await ApiClient.post("/api/correspondences/", {
+                    station_id: st1Id,
+                    station_id_2: st2Id,
+                    from_station_id: st1Id,
+                    to_station_id: st2Id
+                });
                 if (!res.ok) {
                     showToast(res.error || "No se pudo conectar correspondencia");
                     return;
@@ -2303,13 +2329,16 @@
                 const walkMin = Math.max(1, Math.round(dMeters / 60));
 
                 const res = await ApiClient.createTransferCorridor({
+                    station_id: st1Id,
+                    station_id_2: st2Id,
                     from_station_id: st1Id,
                     to_station_id: st2Id,
                     distance_meters: dMeters,
+                    distance_m: dMeters,
                     walking_minutes: walkMin
                 });
 
-                if (!res.ok && !res.data) {
+                if (!res.ok && !res.data && !res.corridor) {
                     showToast(res.error || "No se pudo crear el pasillo de correspondencia");
                     return;
                 }
@@ -3792,8 +3821,8 @@
 
             let html = "";
             for (const corridor of NetworkStore.transferCorridors) {
-                const s1Id = corridor.from_station_id || corridor.fromStationId;
-                const s2Id = corridor.to_station_id || corridor.toStationId;
+                const s1Id = Number(corridor.station1_id || corridor.from_station_id || corridor.fromStationId);
+                const s2Id = Number(corridor.station2_id || corridor.to_station_id || corridor.toStationId);
                 const st1 = NetworkStore.stationsById.get(s1Id);
                 const st2 = NetworkStore.stationsById.get(s2Id);
                 if (!st1 || !st2) continue;
@@ -3818,7 +3847,7 @@
 
                 const midX = (p1.x + p2.x) / 2;
                 const midY = (p1.y + p2.y) / 2;
-                const distMeters = corridor.distance_meters || Math.round(Math.hypot(st2.x - st1.x, st2.y - st1.y) * 4);
+                const distMeters = corridor.distance_meters || corridor.distance_m || Math.round(Math.hypot(st2.x - st1.x, st2.y - st1.y) * 4);
                 const walkMin = corridor.walking_minutes || Math.max(1, Math.round(distMeters / 60));
 
                 html += `
@@ -7064,7 +7093,7 @@
                 VisualEditorTools.setTool("connect_segment");
             });
             document.getElementById("btnToolAddCorrespondence")?.addEventListener("click", () => {
-                VisualEditorTools.setTool("add_corridor");
+                VisualEditorTools.setTool("add_correspondence");
             });
             document.getElementById("btnToolAddCorridor")?.addEventListener("click", () => {
                 VisualEditorTools.setTool("add_corridor");

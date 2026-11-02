@@ -383,3 +383,46 @@ class TestCorrespondencesEndpoint:
         net_resp2 = api_client.get("/api/network/")
         net_data2 = net_resp2.json()
         assert not any(c["id"] == corr_id for c in net_data2["transfer_corridors"])
+    def test_create_corridor_with_from_to_station_id_keys(self, api_client, minimal_network):
+        """
+        Verifica que api_create_transfer_corridor acepte from_station_id y to_station_id,
+        retorne claves consistentes y normalizadas, y sincronice transbordos entre líneas separadas.
+        """
+        st_alfa = minimal_network["st_alfa"]    # Línea 1
+        st_gamma = minimal_network["st_gamma"]  # Línea 2
+
+        resp = api_client.post(
+            "/api/corridors/create/",
+            data=json.dumps({
+                "from_station_id": st_alfa.id,
+                "to_station_id": st_gamma.id,
+                "distance_meters": 120.0,
+                "walking_minutes": 2,
+            }),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert "corridor" in data
+        c = data["corridor"]
+        assert c["station1_id"] == st_alfa.id
+        assert c["station2_id"] == st_gamma.id
+        assert c["from_station_id"] == st_alfa.id
+        assert c["to_station_id"] == st_gamma.id
+        assert c["distance_meters"] == 120.0
+        assert c["walking_minutes"] == 2
+
+        st_alfa.refresh_from_db()
+        st_gamma.refresh_from_db()
+        assert st_alfa.is_transfer is True
+        assert st_gamma.is_transfer is True
+
+        # Limpiar eliminando pasillo creado en prueba
+        del_resp = api_client.post(
+            "/api/corridors/delete/",
+            data=json.dumps({"corridor_id": c["id"]}),
+            content_type="application/json",
+        )
+        assert del_resp.status_code == 200
+

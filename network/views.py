@@ -1814,9 +1814,12 @@ def api_create_correspondence(request):
                 "id": corr_id,
                 "station1_id": st1.id,
                 "station2_id": st2.id,
+                "from_station_id": st1.id,
+                "to_station_id": st2.id,
                 "station1_name": st1.name,
                 "station2_name": st2.name,
                 "distance_m": dist_m,
+                "distance_meters": dist_m,
                 "walking_minutes": walk_min,
                 "waypoints": [],
             }
@@ -1888,8 +1891,19 @@ def api_create_transfer_corridor(request):
     except json.JSONDecodeError:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
-    st1_id = payload.get("station_id") or payload.get("station_id_1") or payload.get("station1_id")
-    st2_id = payload.get("station_id_2") or payload.get("station2_id")
+    st1_id = (
+        payload.get("station_id")
+        or payload.get("station_id_1")
+        or payload.get("station1_id")
+        or payload.get("from_station_id")
+        or payload.get("fromStationId")
+    )
+    st2_id = (
+        payload.get("station_id_2")
+        or payload.get("station2_id")
+        or payload.get("to_station_id")
+        or payload.get("toStationId")
+    )
     waypoints = payload.get("waypoints", [])
 
     if not st1_id or not st2_id:
@@ -1918,17 +1932,20 @@ def api_create_transfer_corridor(request):
     LineStation.objects.filter(station__in=[st1, st2]).update(correspondences_text=corr_text)
 
     dist_px = math.hypot(st1.x - st2.x, st1.y - st2.y)
-    dist_m = max(30.0, round(dist_px * 18.5, 1))
-    walk_min = max(1, round(dist_m / 75.0))
-    corr_id = f"corridor-{min(st1.id, st2.id)}-{max(st1.id, st2.id)}"
+    dist_m = float(payload.get("distance_meters") or payload.get("distance_m") or max(30.0, round(dist_px * 18.5, 1)))
+    walk_min = int(payload.get("walking_minutes") or max(1, round(dist_m / 75.0)))
+    corr_id = payload.get("id") or f"corridor-{min(st1.id, st2.id)}-{max(st1.id, st2.id)}"
 
     corridor_data = {
         "id": corr_id,
         "station1_id": st1.id,
         "station2_id": st2.id,
+        "from_station_id": st1.id,
+        "to_station_id": st2.id,
         "station1_name": st1.name,
         "station2_name": st2.name,
         "distance_m": dist_m,
+        "distance_meters": dist_m,
         "walking_minutes": walk_min,
         "waypoints": waypoints,
     }
@@ -1957,8 +1974,17 @@ def api_delete_transfer_corridor(request):
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
     corr_id = payload.get("corridor_id") or payload.get("id")
-    st1_id = payload.get("station_id") or payload.get("station_id_1")
-    st2_id = payload.get("station_id_2")
+    st1_id = (
+        payload.get("station_id")
+        or payload.get("station_id_1")
+        or payload.get("station1_id")
+        or payload.get("from_station_id")
+    )
+    st2_id = (
+        payload.get("station_id_2")
+        or payload.get("station2_id")
+        or payload.get("to_station_id")
+    )
 
     ex_corrs = get_cached_transfer_corridors()
     if corr_id:

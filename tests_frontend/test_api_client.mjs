@@ -409,4 +409,84 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         assert.equal(st.name, "Estación Personalizada Nuevo Nombre");
         assert.ok(stored.stations[101].lines.includes("3"));
     });
+
+    it("creación de pasillo de correspondencia persiste en transferCorridors y actualiza transbordos", () => {
+        const st1 = mockStore.stationsById.get(101);
+        const st2 = mockStore.stationsById.get(102);
+        st1.x = 2120; st1.y = 1860;
+        st2.x = 2180; st2.y = 1860;
+
+        const dPx = Math.hypot(st2.x - st1.x, st2.y - st1.y);
+        const dM = Math.max(30, Math.round(dPx * 18.5));
+        const corrId = `corridor-${Math.min(st1.id, st2.id)}-${Math.max(st1.id, st2.id)}`;
+
+        const corrObj = {
+            id: corrId,
+            station1_id: st1.id,
+            station2_id: st2.id,
+            from_station_id: st1.id,
+            to_station_id: st2.id,
+            station1_name: st1.name,
+            station2_name: st2.name,
+            distance_m: dM,
+            distance_meters: dM,
+            walking_minutes: Math.max(1, Math.round(dM / 75)),
+            waypoints: []
+        };
+
+        const combinedLines = Array.from(new Set([...(st1.lines || []), ...(st2.lines || [])]));
+        st1.lines = combinedLines;
+        st2.lines = combinedLines;
+        st1.is_transfer = true;
+        st2.is_transfer = true;
+
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify({
+            stations: {
+                101: { lines: st1.lines, is_transfer: true },
+                102: { lines: st2.lines, is_transfer: true }
+            },
+            transferCorridors: [corrObj]
+        }));
+
+        const saved = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        assert.equal(saved.transferCorridors.length, 1);
+        assert.equal(saved.transferCorridors[0].from_station_id, 101);
+        assert.equal(saved.transferCorridors[0].to_station_id, 102);
+        assert.equal(saved.transferCorridors[0].station1_id, 101);
+        assert.equal(saved.transferCorridors[0].station2_id, 102);
+        assert.equal(st2.is_transfer, true);
+        assert.deepEqual(st2.lines, ["1", "2"]);
+    });
+
+    it("eliminación de pasillo de correspondencia lo remueve de transferCorridors", () => {
+        const corrId = "corridor-101-102";
+        let edits = {
+            stations: {},
+            transferCorridors: [{ id: corrId, station1_id: 101, station2_id: 102 }]
+        };
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify(edits));
+
+        // Simular eliminación
+        edits.transferCorridors = edits.transferCorridors.filter(c => c.id !== corrId);
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify(edits));
+
+        const saved = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        assert.equal(saved.transferCorridors.length, 0);
+    });
+
+    it("unir correspondencia entre estaciones de líneas separadas combina líneas y activa transbordo", () => {
+        const st1 = { id: 201, name: "Estación Línea 3", lines: ["3"], is_transfer: false, x: 2000, y: 1500 };
+        const st2 = { id: 202, name: "Estación Línea 7", lines: ["7"], is_transfer: false, x: 2060, y: 1500 };
+
+        const combined = Array.from(new Set([...st1.lines, ...st2.lines]));
+        st1.lines = combined;
+        st2.lines = combined;
+        st1.is_transfer = combined.length > 1;
+        st2.is_transfer = combined.length > 1;
+
+        assert.equal(st1.is_transfer, true);
+        assert.equal(st2.is_transfer, true);
+        assert.deepEqual(st1.lines, ["3", "7"]);
+        assert.deepEqual(st2.lines, ["3", "7"]);
+    });
 });

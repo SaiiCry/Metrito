@@ -40,6 +40,8 @@ from .seed import (
     apply_user_network_layer,
     cargar_fuente_cartografica,
     export_user_network_layer,
+    get_cached_transfer_corridors,
+    set_cached_transfer_corridors,
     seed_database,
     xy_to_latlng,
 )
@@ -246,12 +248,15 @@ def api_network_data(request):
         for a in OperationalAlert.objects.select_related("line", "station").all()[:40]
     ]
 
+    transfer_corridors_list = get_cached_transfer_corridors()
+
     return JsonResponse(
         {
             "city_outlines": outlines,
             "lines": lines_list,
             "stations": list(stations_dict.values()),
             "alerts": alerts_list,
+            "transfer_corridors": transfer_corridors_list,
             "kpis": {
                 "total_lines": len(lines_list),
                 "metro_lines_count": sum(1 for l in lines_list if l["network_type"] == "metro"),
@@ -1799,13 +1804,35 @@ def api_create_correspondence(request):
             corr_text = "/".join(all_lines)
             LineStation.objects.filter(station__in=[st1, st2]).update(correspondences_text=corr_text)
 
+        corridor_data = None
+        dist_px = math.hypot(st1.x - st2.x, st1.y - st2.y)
+        if dist_px >= 10.0:
+            dist_m = max(30.0, round(dist_px * 18.5, 1))
+            walk_min = max(1, round(dist_m / 75.0))
+            corr_id = f"corridor-{min(st1.id, st2.id)}-{max(st1.id, st2.id)}"
+            corridor_data = {
+                "id": corr_id,
+                "station1_id": st1.id,
+                "station2_id": st2.id,
+                "station1_name": st1.name,
+                "station2_name": st2.name,
+                "distance_m": dist_m,
+                "walking_minutes": walk_min,
+                "waypoints": [],
+            }
+            ex_corrs = [c for c in get_cached_transfer_corridors() if c.get("id") != corr_id]
+            ex_corrs.append(corridor_data)
+            set_cached_transfer_corridors(ex_corrs)
+
         export_user_network_layer()
+
         return JsonResponse({
             "ok": True,
             "station_1": st1.name,
             "station_2": st2.name,
             "is_transfer": True,
             "combined_lines": all_lines,
+            "corridor": corridor_data,
         })
 
     return JsonResponse({"error": "Parámetros insuficientes para crear correspondencia."}, status=400)
@@ -1847,3 +1874,100 @@ def api_editor_status(request):
         "modified_lines_count": TransitLine.objects.filter(is_custom_modified=True).count(),
         "last_updated": layer.updated_at.strftime("%Y-%m-%d %H:%M:%S") if layer and layer.updated_at else None,
     })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_transfer_corridor(request):
+    """
+    Crea un pasillo de correspondencia peatonal entre dos estaciones distantes.
+    Enlaza transbordo, calcula distancia métrica y persiste en UserNetworkEditLayer.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    st1_id = payload.get("station_id") or payload.get("station_id_1") or payload.get("station1_id")
+    st2_id = payload.get("station_id_2") or payload.get("station2_id")
+    waypoints = payload.get("waypoints", [])
+
+    if not st1_id or not st2_id:
+        return JsonResponse({"error": "Se requieren ambas estaciones (station_id y station_id_2)"}, status=400)
+
+    st1 = Station.objects.filter(id=int(st1_id)).first()
+    st2 = Station.objects.filter(id=int(st2_id)).first()
+    if not st1 or not st2:
+        return JsonResponse({"error": "Una o ambas estaciones no existen."}, status=400)
+
+    if st1.id == st2.id:
+        return JsonResponse({"error": "No se puede tender un pasillo consigo misma."}, status=400)
+
+    # Asegurar correspondencia entre ambas
+    st1.is_transfer = True
+    st2.is_transfer = True
+    st1.is_custom_modified = True
+    st2.is_custom_modified = True
+    st1.save(update_fields=["is_transfer", "is_custom_modified"])
+    st2.save(update_fields=["is_transfer", "is_custom_modified"])
+
+    lines_st1 = set(LineStation.objects.filter(station=st1).values_list("line__code", flat=True))
+    lines_st2 = set(LineStation.objects.filter(station=st2).values_list("line__code", flat=True))
+    all_lines = sorted(list(lines_st1.union(lines_st2)))
+    corr_text = "/".join(all_lines)
+    LineStation.objects.filter(station__in=[st1, st2]).update(correspondences_text=corr_text)
+
+    dist_px = math.hypot(st1.x - st2.x, st1.y - st2.y)
+    dist_m = max(30.0, round(dist_px * 18.5, 1))
+    walk_min = max(1, round(dist_m / 75.0))
+    corr_id = f"corridor-{min(st1.id, st2.id)}-{max(st1.id, st2.id)}"
+
+    corridor_data = {
+        "id": corr_id,
+        "station1_id": st1.id,
+        "station2_id": st2.id,
+        "station1_name": st1.name,
+        "station2_name": st2.name,
+        "distance_m": dist_m,
+        "walking_minutes": walk_min,
+        "waypoints": waypoints,
+    }
+
+    ex_corrs = [c for c in get_cached_transfer_corridors() if c.get("id") != corr_id]
+    ex_corrs.append(corridor_data)
+    set_cached_transfer_corridors(ex_corrs)
+
+    export_user_network_layer()
+    return JsonResponse({
+        "ok": True,
+        "corridor": corridor_data,
+        "combined_lines": all_lines,
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_delete_transfer_corridor(request):
+    """
+    Elimina un pasillo de correspondencia peatonal.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    corr_id = payload.get("corridor_id") or payload.get("id")
+    st1_id = payload.get("station_id") or payload.get("station_id_1")
+    st2_id = payload.get("station_id_2")
+
+    ex_corrs = get_cached_transfer_corridors()
+    if corr_id:
+        ex_corrs = [c for c in ex_corrs if c.get("id") != corr_id]
+    elif st1_id and st2_id:
+        sid1, sid2 = int(st1_id), int(st2_id)
+        target_id = f"corridor-{min(sid1, sid2)}-{max(sid1, sid2)}"
+        ex_corrs = [c for c in ex_corrs if c.get("id") != target_id]
+    set_cached_transfer_corridors(ex_corrs)
+
+    export_user_network_layer()
+    return JsonResponse({"ok": True, "deleted": True})

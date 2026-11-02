@@ -499,6 +499,28 @@ def seed_database(force_reset: bool = False) -> Dict[str, Any]:
     }
 
 
+_cached_transfer_corridors: Optional[List[Dict[str, Any]]] = None
+
+
+def get_cached_transfer_corridors() -> List[Dict[str, Any]]:
+    global _cached_transfer_corridors
+    if _cached_transfer_corridors is None:
+        _cached_transfer_corridors = []
+        if RUTA_USER_EDITS_JSON.exists():
+            try:
+                edits = json.loads(RUTA_USER_EDITS_JSON.read_text(encoding="utf-8"))
+                if isinstance(edits, dict):
+                    _cached_transfer_corridors = list(edits.get("transfer_corridors", []))
+            except Exception:
+                pass
+    return list(_cached_transfer_corridors)
+
+
+def set_cached_transfer_corridors(corridors: List[Dict[str, Any]]) -> None:
+    global _cached_transfer_corridors
+    _cached_transfer_corridors = list(corridors)
+
+
 def export_user_network_layer(deleted_station_code: str = None, deleted_station_id: int = None) -> Dict[str, Any]:
     """
     Serializa todas las adiciones y modificaciones realizadas por el usuario:
@@ -625,6 +647,8 @@ def export_user_network_layer(deleted_station_code: str = None, deleted_station_
         _cached_deleted_stations.add(str(deleted_station_id))
     existing_deleted = list(_cached_deleted_stations)
 
+    transfer_corridors = get_cached_transfer_corridors()
+
     layer_payload = {
         "version": 1,
         "created_stations": created_stations,
@@ -633,6 +657,7 @@ def export_user_network_layer(deleted_station_code: str = None, deleted_station_
         "modified_lines": modified_lines,
         "route_overrides": route_overrides,
         "deleted_stations": existing_deleted,
+        "transfer_corridors": transfer_corridors,
     }
 
     # Guardar en SQLite (modelo UserNetworkEditLayer)
@@ -680,6 +705,9 @@ def apply_user_network_layer(layer_data: Dict[str, Any] = None) -> Dict[str, Any
 
     if not layer_data:
         return {"applied": False, "reason": "No hay capa de edición disponible"}
+
+    if "transfer_corridors" in layer_data:
+        set_cached_transfer_corridors(layer_data.get("transfer_corridors", []))
 
     applied_stations = 0
     applied_lines = 0

@@ -37,8 +37,13 @@
         infraFilter: "all",          // 'all' | 'subterraneo' | 'tunel_profundo' | 'superficial' | 'elevado' | 'closed_permanent' | 'construction'
         isolatedLineCode: null,      // Código de línea aislada o null
         showLabels: true,
+        showCityOutlines: false,
         editMode: false,
         trackWidthScale: 1.0,
+        distanceScale: 1.0,
+        hiddenLines: new Set(),
+        transferCorridors: [],
+        transferCorridorsById: new Map(),
         draftRouteStops: [],
         activeLineCode: "1",
         selectedStationId: null,
@@ -105,6 +110,79 @@
             }
 
             this.sortedStations = [...this.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+            this.transferCorridors = [];
+            this.transferCorridorsById.clear();
+            const rawCorrs = Array.isArray(data.transfer_corridors) ? data.transfer_corridors : [];
+            const storedCorrs = (typeof ApiClient !== "undefined" && typeof ApiClient.getStoredEdits === "function")
+                ? (ApiClient.getStoredEdits().transferCorridors || [])
+                : [];
+            const combinedCorrs = [...rawCorrs];
+            for (const sc of storedCorrs) {
+                if (!combinedCorrs.some(c => c.id === sc.id)) {
+                    combinedCorrs.push(sc);
+                }
+            }
+            for (const c of combinedCorrs) {
+                this.transferCorridors.push(c);
+                this.transferCorridorsById.set(c.id, c);
+            }
+        },
+
+        toggleLineVisibility(lineCode) {
+            const code = String(lineCode).trim();
+            if (this.hiddenLines.has(code)) {
+                this.hiddenLines.delete(code);
+                return true; // Ahora es visible
+            } else {
+                this.hiddenLines.add(code);
+                return false; // Ahora está oculta
+            }
+        },
+
+        hideLine(lineCode) {
+            this.hiddenLines.add(String(lineCode).trim());
+        },
+
+        showLine(lineCode) {
+            this.hiddenLines.delete(String(lineCode).trim());
+        },
+
+        isLineHidden(lineCode) {
+            return this.hiddenLines.has(String(lineCode).trim());
+        },
+
+        showAllLines() {
+            this.hiddenLines.clear();
+        },
+
+        hideAllLines() {
+            this.hiddenLines = new Set(this.lines.map(l => l.code));
+        },
+
+        setDistanceScale(scale) {
+            this.distanceScale = Math.max(0.5, Math.min(3.0, Number(scale) || 1.0));
+        },
+
+        addTransferCorridor(corr) {
+            if (!corr || !corr.id) return;
+            const existingIdx = this.transferCorridors.findIndex(c => c.id === corr.id);
+            if (existingIdx >= 0) {
+                this.transferCorridors[existingIdx] = corr;
+            } else {
+                this.transferCorridors.push(corr);
+            }
+            this.transferCorridorsById.set(corr.id, corr);
+        },
+
+        removeTransferCorridor(corrId) {
+            this.transferCorridors = this.transferCorridors.filter(c => c.id !== corrId);
+            this.transferCorridorsById.delete(corrId);
+        },
+
+        getCorridorsForStation(stId) {
+            const numId = Number(stId);
+            return this.transferCorridors.filter(c => Number(c.station1_id) === numId || Number(c.station2_id) === numId);
         },
 
         getSortedStations() {
@@ -238,10 +316,11 @@
                     createdStations: Array.isArray(obj?.createdStations) ? obj.createdStations : [],
                     createdLines: Array.isArray(obj?.createdLines) ? obj.createdLines : [],
                     cityOutlines: obj?.cityOutlines || {},
-                    deletedStations: Array.isArray(obj?.deletedStations) ? obj.deletedStations : []
+                    deletedStations: Array.isArray(obj?.deletedStations) ? obj.deletedStations : [],
+                    transferCorridors: Array.isArray(obj?.transferCorridors) ? obj.transferCorridors : []
                 };
             } catch (e) {
-                return { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {}, deletedStations: [] };
+                return { stations: {}, lines: {}, createdStations: [], createdLines: [], cityOutlines: {}, deletedStations: [], transferCorridors: [] };
             }
         },
 
@@ -349,7 +428,22 @@
                     const st = NetworkStore.stationsById.get(stId);
                     if (st) {
                         Object.assign(st, patch);
+                        if (patch.name) {
+                            st.name = patch.name;
+                        }
                         applied = true;
+                    }
+                }
+            }
+
+            // Sincronizar station_name en todas las paradas de línea con el nombre canónico de la estación
+            for (const ln of NetworkStore.lines) {
+                if (Array.isArray(ln.stops)) {
+                    for (const sp of ln.stops) {
+                        const st = NetworkStore.stationsById.get(sp.station_id);
+                        if (st && st.name) {
+                            sp.station_name = st.name;
+                        }
                     }
                 }
             }
@@ -374,6 +468,14 @@
                         Object.assign(outline, patch);
                         applied = true;
                     }
+                }
+            }
+
+            // 6. Pasillos de correspondencia peatonal
+            if (Array.isArray(edits.transferCorridors) && edits.transferCorridors.length > 0) {
+                for (const corr of edits.transferCorridors) {
+                    NetworkStore.addTransferCorridor(corr);
+                    applied = true;
                 }
             }
 
@@ -466,13 +568,25 @@
                 }
 
                 if (updateStorage) {
-                    edits.stations[stId] = {
+                    if (!edits.stations[stId]) edits.stations[stId] = {};
+                    Object.assign(edits.stations[stId], {
+                        name: st.name,
                         lines: st.lines,
                         is_transfer: st.is_transfer,
                         terminal_lines: st.terminal_lines,
                         is_terminal: st.is_terminal,
                         is_custom_modified: true
-                    };
+                    });
+                    if (st.custom_color) edits.stations[stId].custom_color = st.custom_color;
+                    if (Array.isArray(st.icon_tags)) edits.stations[stId].icon_tags = st.icon_tags;
+                    const createdSt = (edits.createdStations || []).find(s => s.id === stId || s.code === st.code);
+                    if (createdSt) {
+                        createdSt.name = st.name;
+                        createdSt.lines = st.lines;
+                        createdSt.is_transfer = st.is_transfer;
+                        createdSt.terminal_lines = st.terminal_lines;
+                        createdSt.is_terminal = st.is_terminal;
+                    }
                     this.saveStoredEdits(edits);
                 }
 
@@ -504,9 +618,64 @@
                         st1.is_custom_modified = true;
                         st2.is_custom_modified = true;
 
+                        // Si las estaciones tienen distancia física suficiente, generar pasillo de correspondencia
+                        const distPx = Math.hypot(st1.x - st2.x, st1.y - st2.y);
+                        let autoCorridor = null;
+                        if (distPx >= 10.0) {
+                            const distM = Math.max(30, Math.round(distPx * 18.5));
+                            const corrId = `corridor-${Math.min(st1Id, st2Id)}-${Math.max(st1Id, st2Id)}`;
+                            autoCorridor = {
+                                id: corrId,
+                                station1_id: st1Id,
+                                station2_id: st2Id,
+                                station1_name: st1.name,
+                                station2_name: st2.name,
+                                distance_m: distM,
+                                walking_minutes: Math.max(1, Math.round(distM / 75)),
+                                waypoints: []
+                            };
+                            if (!edits.transferCorridors) edits.transferCorridors = [];
+                            edits.transferCorridors = edits.transferCorridors.filter(c => c.id !== corrId);
+                            edits.transferCorridors.push(autoCorridor);
+                            NetworkStore.addTransferCorridor(autoCorridor);
+                        }
+
                         if (updateStorage) {
-                            edits.stations[st1Id] = { lines: st1.lines, is_transfer: st1.is_transfer, is_custom_modified: true };
-                            edits.stations[st2Id] = { lines: st2.lines, is_transfer: st2.is_transfer, is_custom_modified: true };
+                            if (!edits.stations[st1Id]) edits.stations[st1Id] = {};
+                            Object.assign(edits.stations[st1Id], {
+                                name: st1.name,
+                                lines: st1.lines,
+                                is_transfer: st1.is_transfer,
+                                is_custom_modified: true
+                            });
+                            if (st1.custom_color) edits.stations[st1Id].custom_color = st1.custom_color;
+                            if (Array.isArray(st1.terminal_lines)) edits.stations[st1Id].terminal_lines = st1.terminal_lines;
+                            if (Array.isArray(st1.icon_tags)) edits.stations[st1Id].icon_tags = st1.icon_tags;
+
+                            if (!edits.stations[st2Id]) edits.stations[st2Id] = {};
+                            Object.assign(edits.stations[st2Id], {
+                                name: st2.name,
+                                lines: st2.lines,
+                                is_transfer: st2.is_transfer,
+                                is_custom_modified: true
+                            });
+                            if (st2.custom_color) edits.stations[st2Id].custom_color = st2.custom_color;
+                            if (Array.isArray(st2.terminal_lines)) edits.stations[st2Id].terminal_lines = st2.terminal_lines;
+                            if (Array.isArray(st2.icon_tags)) edits.stations[st2Id].icon_tags = st2.icon_tags;
+
+                            const cr1 = (edits.createdStations || []).find(s => s.id === st1Id || s.code === st1.code);
+                            if (cr1) {
+                                cr1.name = st1.name;
+                                cr1.lines = st1.lines;
+                                cr1.is_transfer = st1.is_transfer;
+                            }
+                            const cr2 = (edits.createdStations || []).find(s => s.id === st2Id || s.code === st2.code);
+                            if (cr2) {
+                                cr2.name = st2.name;
+                                cr2.lines = st2.lines;
+                                cr2.is_transfer = st2.is_transfer;
+                            }
+
                             this.saveStoredEdits(edits);
                         }
 
@@ -568,7 +737,24 @@
                     }
 
                     if (updateStorage) {
-                        edits.stations[st1Id] = { lines: st1.lines, is_transfer: st1.is_transfer, is_custom_modified: true };
+                        if (!edits.stations[st1Id]) edits.stations[st1Id] = {};
+                        Object.assign(edits.stations[st1Id], {
+                            name: st1.name,
+                            lines: st1.lines,
+                            is_transfer: st1.is_transfer,
+                            is_custom_modified: true
+                        });
+                        if (st1.custom_color) edits.stations[st1Id].custom_color = st1.custom_color;
+                        if (Array.isArray(st1.terminal_lines)) edits.stations[st1Id].terminal_lines = st1.terminal_lines;
+                        if (Array.isArray(st1.icon_tags)) edits.stations[st1Id].icon_tags = st1.icon_tags;
+
+                        const cr1 = (edits.createdStations || []).find(s => s.id === st1Id || s.code === st1.code);
+                        if (cr1) {
+                            cr1.name = st1.name;
+                            cr1.lines = st1.lines;
+                            cr1.is_transfer = st1.is_transfer;
+                        }
+
                         this.saveStoredEdits(edits);
                     }
 
@@ -593,6 +779,25 @@
                 if (st) {
                     Object.assign(st, payload);
                     st.is_custom_modified = true;
+                    if (payload.name) {
+                        st.name = payload.name;
+                        for (const ln of NetworkStore.lines) {
+                            if (Array.isArray(ln.stops)) {
+                                let changed = false;
+                                for (const sp of ln.stops) {
+                                    if (sp.station_id === stId || sp.station_code === st.code) {
+                                        sp.station_name = payload.name;
+                                        changed = true;
+                                    }
+                                }
+                                if (changed && updateStorage) {
+                                    if (!edits.lines[ln.code]) edits.lines[ln.code] = { stops: ln.stops, is_custom_modified: true };
+                                    else edits.lines[ln.code].stops = ln.stops;
+                                }
+                            }
+                        }
+                        NetworkStore.sortedStations = null;
+                    }
                     if (payload.lines !== undefined) {
                         st.lines = Array.isArray(payload.lines) ? payload.lines : [];
                         st.is_transfer = st.lines.length > 1;
@@ -625,6 +830,13 @@
                     if (updateStorage) {
                         if (!edits.stations[stId]) edits.stations[stId] = {};
                         Object.assign(edits.stations[stId], payload, { is_custom_modified: true });
+                        if (payload.name) {
+                            edits.stations[stId].name = payload.name;
+                        }
+                        const createdSt = (edits.createdStations || []).find(s => s.id === stId || s.code === st.code);
+                        if (createdSt) {
+                            Object.assign(createdSt, payload, { is_custom_modified: true });
+                        }
                         this.saveStoredEdits(edits);
                     }
                     return { ok: true, server: false, station: st };
@@ -840,13 +1052,25 @@
                             st.is_custom_modified = true;
                             if (updateStorage) {
                                 if (!edits.stations) edits.stations = {};
-                                edits.stations[st.id] = {
+                                if (!edits.stations[st.id]) edits.stations[st.id] = {};
+                                Object.assign(edits.stations[st.id], {
+                                    name: st.name,
                                     lines: st.lines,
                                     is_transfer: st.is_transfer,
                                     terminal_lines: st.terminal_lines,
                                     is_terminal: st.is_terminal,
                                     is_custom_modified: true
-                                };
+                                });
+                                if (st.custom_color) edits.stations[st.id].custom_color = st.custom_color;
+                                if (Array.isArray(st.icon_tags)) edits.stations[st.id].icon_tags = st.icon_tags;
+                                const cr = (edits.createdStations || []).find(s => s.id === st.id || s.code === st.code);
+                                if (cr) {
+                                    cr.name = st.name;
+                                    cr.lines = st.lines;
+                                    cr.is_transfer = st.is_transfer;
+                                    cr.terminal_lines = st.terminal_lines;
+                                    cr.is_terminal = st.is_terminal;
+                                }
                             }
                         } else if (!hasLine && inCurrent) {
                             if (!st.lines) st.lines = [];
@@ -855,13 +1079,25 @@
                             st.is_custom_modified = true;
                             if (updateStorage) {
                                 if (!edits.stations) edits.stations = {};
-                                edits.stations[st.id] = {
+                                if (!edits.stations[st.id]) edits.stations[st.id] = {};
+                                Object.assign(edits.stations[st.id], {
+                                    name: st.name,
                                     lines: st.lines,
                                     is_transfer: st.is_transfer,
                                     terminal_lines: st.terminal_lines,
                                     is_terminal: st.is_terminal,
                                     is_custom_modified: true
-                                };
+                                });
+                                if (st.custom_color) edits.stations[st.id].custom_color = st.custom_color;
+                                if (Array.isArray(st.icon_tags)) edits.stations[st.id].icon_tags = st.icon_tags;
+                                const cr = (edits.createdStations || []).find(s => s.id === st.id || s.code === st.code);
+                                if (cr) {
+                                    cr.name = st.name;
+                                    cr.lines = st.lines;
+                                    cr.is_transfer = st.is_transfer;
+                                    cr.terminal_lines = st.terminal_lines;
+                                    cr.is_terminal = st.is_terminal;
+                                }
                             }
                         }
                     }
@@ -1070,8 +1306,43 @@
 
                     if (updateStorage) {
                         edits.lines[lineCode] = { stops: ln.stops, is_custom_modified: true };
-                        edits.stations[fromId] = { lines: st1.lines, is_transfer: st1.is_transfer };
-                        edits.stations[toId] = { lines: st2.lines, is_transfer: st2.is_transfer };
+                        if (!edits.stations) edits.stations = {};
+                        if (!edits.stations[fromId]) edits.stations[fromId] = {};
+                        Object.assign(edits.stations[fromId], {
+                            name: st1.name,
+                            lines: st1.lines,
+                            is_transfer: st1.is_transfer,
+                            terminal_lines: st1.terminal_lines,
+                            is_terminal: st1.is_terminal,
+                            is_custom_modified: true
+                        });
+                        if (st1.custom_color) edits.stations[fromId].custom_color = st1.custom_color;
+                        if (Array.isArray(st1.icon_tags)) edits.stations[fromId].icon_tags = st1.icon_tags;
+                        const cr1 = (edits.createdStations || []).find(s => s.id === fromId || s.code === st1.code);
+                        if (cr1) {
+                            cr1.name = st1.name;
+                            cr1.lines = st1.lines;
+                            cr1.is_transfer = st1.is_transfer;
+                        }
+
+                        if (!edits.stations[toId]) edits.stations[toId] = {};
+                        Object.assign(edits.stations[toId], {
+                            name: st2.name,
+                            lines: st2.lines,
+                            is_transfer: st2.is_transfer,
+                            terminal_lines: st2.terminal_lines,
+                            is_terminal: st2.is_terminal,
+                            is_custom_modified: true
+                        });
+                        if (st2.custom_color) edits.stations[toId].custom_color = st2.custom_color;
+                        if (Array.isArray(st2.icon_tags)) edits.stations[toId].icon_tags = st2.icon_tags;
+                        const cr2 = (edits.createdStations || []).find(s => s.id === toId || s.code === st2.code);
+                        if (cr2) {
+                            cr2.name = st2.name;
+                            cr2.lines = st2.lines;
+                            cr2.is_transfer = st2.is_transfer;
+                        }
+
                         this.saveStoredEdits(edits);
                     }
                     return { ok: true, server: false, line_code: lineCode, total_stops: ln.stops.length };
@@ -1129,6 +1400,82 @@
             if (endpoint.includes("/editor/discard/") || endpoint.includes("/user-edits/discard/") || endpoint.includes("/network/reset/")) {
                 this.clearStoredEdits();
                 return { ok: true, server: false, discarded: true };
+            }
+
+            // N) Pasillos de correspondencia peatonal
+            if (endpoint.includes("/corridors")) {
+                if (payload?.action === "delete" || endpoint.includes("/delete")) {
+                    const corrId = payload?.corridor_id || payload?.id;
+                    const st1Id = Number(payload?.station_id || payload?.station_id_1);
+                    const st2Id = Number(payload?.station_id_2);
+                    const targetId = corrId || (st1Id && st2Id ? `corridor-${Math.min(st1Id, st2Id)}-${Math.max(st1Id, st2Id)}` : null);
+                    if (targetId) {
+                        edits.transferCorridors = (edits.transferCorridors || []).filter(c => c.id !== targetId);
+                        NetworkStore.removeTransferCorridor(targetId);
+                        if (updateStorage) this.saveStoredEdits(edits);
+                        return { ok: true, server: false, deleted: true, corridor_id: targetId };
+                    }
+                    return { ok: false, error: "Identificador de pasillo no especificado" };
+                }
+
+                // Crear pasillo
+                const st1Id = Number(payload.station_id || payload.station_id_1 || payload.station1_id);
+                const st2Id = Number(payload.station_id_2 || payload.station2_id);
+                const st1 = NetworkStore.stationsById.get(st1Id);
+                const st2 = NetworkStore.stationsById.get(st2Id);
+                if (!st1 || !st2) return { ok: false, error: "Estación(es) no encontrada(s)" };
+                if (st1Id === st2Id) return { ok: false, error: "No se puede tender un pasillo consigo misma" };
+
+                const combinedLines = Array.from(new Set([...(st1.lines || []), ...(st2.lines || [])]));
+                st1.lines = combinedLines;
+                st2.lines = combinedLines;
+                st1.is_transfer = combinedLines.length > 1;
+                st2.is_transfer = combinedLines.length > 1;
+                st1.is_custom_modified = true;
+                st2.is_custom_modified = true;
+
+                const distPx = Math.hypot(st1.x - st2.x, st1.y - st2.y);
+                const distM = Math.max(30, Math.round(distPx * 18.5));
+                const corrId = `corridor-${Math.min(st1Id, st2Id)}-${Math.max(st1Id, st2Id)}`;
+                const corrObj = {
+                    id: corrId,
+                    station1_id: st1Id,
+                    station2_id: st2Id,
+                    station1_name: st1.name,
+                    station2_name: st2.name,
+                    distance_m: distM,
+                    walking_minutes: Math.max(1, Math.round(distM / 75)),
+                    waypoints: Array.isArray(payload.waypoints) ? payload.waypoints : []
+                };
+
+                if (!edits.transferCorridors) edits.transferCorridors = [];
+                edits.transferCorridors = edits.transferCorridors.filter(c => c.id !== corrId);
+                edits.transferCorridors.push(corrObj);
+                NetworkStore.addTransferCorridor(corrObj);
+
+                if (updateStorage) {
+                    if (!edits.stations[st1Id]) edits.stations[st1Id] = {};
+                    edits.stations[st1Id].lines = st1.lines;
+                    edits.stations[st1Id].is_transfer = st1.is_transfer;
+                    edits.stations[st1Id].is_custom_modified = true;
+
+                    if (!edits.stations[st2Id]) edits.stations[st2Id] = {};
+                    edits.stations[st2Id].lines = st2.lines;
+                    edits.stations[st2Id].is_transfer = st2.is_transfer;
+                    edits.stations[st2Id].is_custom_modified = true;
+
+                    this.saveStoredEdits(edits);
+                }
+
+                return {
+                    ok: true,
+                    server: false,
+                    corridor: corrObj,
+                    station_1: st1.name,
+                    station_2: st2.name,
+                    is_transfer: true,
+                    combined_lines: combinedLines
+                };
             }
 
             return { ok: true, server: false };
@@ -1360,9 +1707,10 @@
     // 1C. CONTROLADOR DE HERRAMIENTAS ACTIVAS DEL EDITOR VISUAL
     // =========================================================================
     const VisualEditorTools = {
-        activeTool: null, // 'add_station' | 'connect_segment' | 'add_correspondence'
+        activeTool: null, // 'add_station' | 'connect_segment' | 'add_correspondence' | 'add_corridor'
         segmentSourceStationId: null,
         correspondenceSourceStationId: null,
+        corridorSourceStationId: null,
         pendingLineCaller: null, // 'station' | 'segment' | null
 
         getActiveLineCode() {
@@ -1499,6 +1847,13 @@
                     statusText.textContent = "Haz clic en la 1ra estación para conectar correspondencia directamente en el plano";
                     statusBox.classList.remove("hidden");
                 }
+            } else if (tool === "add_corridor") {
+                document.body.classList.add("tool-active-add_corridor");
+                document.getElementById("btnToolAddCorridor")?.classList.add("active");
+                if (statusBox && statusText) {
+                    statusText.textContent = "Haz clic en la 1ra estación para iniciar el pasillo de correspondencia peatonal";
+                    statusBox.classList.remove("hidden");
+                }
             }
         },
 
@@ -1506,7 +1861,8 @@
             this.activeTool = null;
             this.segmentSourceStationId = null;
             this.correspondenceSourceStationId = null;
-            document.body.classList.remove("tool-active-add_station", "tool-active-connect_segment", "tool-active-add_correspondence");
+            this.corridorSourceStationId = null;
+            document.body.classList.remove("tool-active-add_station", "tool-active-connect_segment", "tool-active-add_correspondence", "tool-active-add_corridor");
             document.querySelectorAll(".ed-tool-btn").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".svg-station-node.connect-source, .svg-station-node.corr-source-pulse, .svg-station-node.connect-target-hover").forEach(el => {
                 el.classList.remove("connect-source", "corr-source-pulse", "connect-target-hover");
@@ -1908,6 +2264,94 @@
                 console.error("Error al establecer correspondencia manual:", err);
                 showToast("Error al conectar correspondencia");
             }
+        },
+
+        handleStationClickForCorridor(stId) {
+            const st = NetworkStore.stationsById.get(stId);
+            if (!st) return;
+
+            if (this.corridorSourceStationId === null) {
+                this.corridorSourceStationId = stId;
+                const nodeEl = document.querySelector(`.svg-station-node[data-station-id="${stId}"]`);
+                if (nodeEl) nodeEl.classList.add("corr-source-pulse");
+                const statusText = document.getElementById("edToolActiveText");
+                if (statusText) {
+                    statusText.textContent = `Estación 1: ${st.name}. Clic en la 2da estación para enlazar el pasillo de correspondencia.`;
+                }
+                showToast(`Paso 1: ${st.name} seleccionada. Ahora haz clic en la 2da estación.`);
+                ControlCenterUI.selectStation(stId);
+            } else {
+                const st1Id = this.corridorSourceStationId;
+                const st2Id = stId;
+                if (st1Id === st2Id) {
+                    showToast("Selecciona una estación destino diferente");
+                    return;
+                }
+                const st1 = NetworkStore.stationsById.get(st1Id);
+                const st2 = NetworkStore.stationsById.get(st2Id);
+                this.cancel();
+                this.establishTransferCorridor(st1Id, st2Id, st1 ? st1.name : "", st2 ? st2.name : "");
+            }
+        },
+
+        async establishTransferCorridor(st1Id, st2Id, st1Name = "", st2Name = "") {
+            try {
+                const st1 = NetworkStore.stationsById.get(st1Id);
+                const st2 = NetworkStore.stationsById.get(st2Id);
+                const dPx = (st1 && st2) ? Math.hypot(st2.x - st1.x, st2.y - st1.y) : 50;
+                const dMeters = Math.max(50, Math.round(dPx * 3.5));
+                const walkMin = Math.max(1, Math.round(dMeters / 60));
+
+                const res = await ApiClient.createTransferCorridor({
+                    from_station_id: st1Id,
+                    to_station_id: st2Id,
+                    distance_meters: dMeters,
+                    walking_minutes: walkMin
+                });
+
+                if (!res.ok && !res.data) {
+                    showToast(res.error || "No se pudo crear el pasillo de correspondencia");
+                    return;
+                }
+
+                await refreshNetworkDataAndRender(true);
+                showToast(`✓ Pasillo de correspondencia creado entre ${st1Name || 'Estación 1'} y ${st2Name || 'Estación 2'} (${dMeters}m)`);
+            } catch (err) {
+                console.error("Error al crear pasillo de correspondencia:", err);
+                showToast("Error al crear pasillo de correspondencia");
+            }
+        },
+
+        async expandActiveLineSpacing() {
+            const lineCode = this.getActiveLineCode();
+            const ln = NetworkStore.linesByCode.get(lineCode);
+            if (!ln || !Array.isArray(ln.stops) || ln.stops.length < 2) {
+                showToast("Selecciona una línea con al menos 2 estaciones para ampliar distancias");
+                return;
+            }
+
+            const stopStations = ln.stops.map(s => NetworkStore.stationsById.get(s.station_id)).filter(Boolean);
+            if (stopStations.length < 2) return;
+
+            const avgX = stopStations.reduce((acc, s) => acc + s.x, 0) / stopStations.length;
+            const avgY = stopStations.reduce((acc, s) => acc + s.y, 0) / stopStations.length;
+
+            let movedCount = 0;
+            for (const st of stopStations) {
+                const isExclusive = !st.lines || st.lines.length <= 1;
+                const factor = isExclusive ? 1.25 : 1.10;
+                const newX = Math.round((avgX + (st.x - avgX) * factor) / 10) * 10;
+                const newY = Math.round((avgY + (st.y - avgY) * factor) / 10) * 10;
+                if (newX !== st.x || newY !== st.y) {
+                    st.x = newX;
+                    st.y = newY;
+                    await ApiClient.updateStation(st.id, { x: newX, y: newY });
+                    movedCount++;
+                }
+            }
+
+            SchematicMapEngine.renderTracksAndStations();
+            showToast(`⚡ Se ampliaron las distancias de ${movedCount} estaciones en Línea ${lineCode} (+25%)`);
         }
     };
 
@@ -2035,6 +2479,9 @@
                 <button type="button" class="ctx-item js-ctx-edit-inspector" data-station-id="${st.id}">
                     <span>✎</span> <span>Editar Estación en Inspector</span>
                 </button>
+                <button type="button" class="ctx-item js-ctx-auto-align-station" data-station-id="${st.id}">
+                    <span>⚡</span> <span>Auto-alinear Recto (0° / 45° / 90°)</span>
+                </button>
                 ${linesHtml}
                 <div class="ctx-divider"></div>
                 <button type="button" class="ctx-item danger js-ctx-delete-station" data-station-id="${st.id}">
@@ -2070,6 +2517,11 @@
                 ControlCenterUI.switchRightTab("editor");
                 document.querySelector('.ed-subtab[data-edtab="station"]')?.click();
                 ControlCenterUI.loadStationIntoEditor(st.id);
+            });
+
+            this.el.querySelector(".js-ctx-auto-align-station")?.addEventListener("click", async () => {
+                this.hide();
+                await ControlCenterUI.autoAlignStation(st.id);
             });
 
             this.el.querySelectorAll(".js-ctx-remove-line").forEach(btn => {
@@ -2580,6 +3032,26 @@
         viewport: null,
         // Vista inicial centrada en la metrópoli con el anillo de Línea A y el núcleo denso
         viewBox: { x: 80, y: 150, w: 4380, h: 3760 },
+
+        logicalToSvgCoords(x, y) {
+            const dScale = NetworkStore.distanceScale || 1.0;
+            if (dScale === 1.0) return { x: Number(x) || 0, y: Number(y) || 0 };
+            const cx = 2760, cy = 1990;
+            return {
+                x: cx + ((Number(x) || 0) - cx) * dScale,
+                y: cy + ((Number(y) || 0) - cy) * dScale
+            };
+        },
+
+        svgToLogicalCoords(svgX, svgY) {
+            const dScale = NetworkStore.distanceScale || 1.0;
+            if (dScale === 1.0) return { x: Number(svgX) || 0, y: Number(svgY) || 0 };
+            const cx = 2760, cy = 1990;
+            return {
+                x: cx + ((Number(svgX) || 0) - cx) / dScale,
+                y: cy + ((Number(svgY) || 0) - cy) / dScale
+            };
+        },
         isPanning: false,
         panStart: { x: 0, y: 0, vx: 0, vy: 0 },
         panBoundingRect: null,
@@ -2681,8 +3153,11 @@
             const relX = clientX !== undefined ? (clientX - rect.left) / rect.width : 0.5;
             const relY = clientY !== undefined ? (clientY - rect.top) / rect.height : 0.5;
 
-            const newW = Math.max(250, Math.min(5520, this.viewBox.w * factor));
-            const newH = Math.max(180, Math.min(3980, this.viewBox.h * factor));
+            const dScale = NetworkStore.distanceScale || 1.0;
+            const maxW = 5520 * Math.max(1.5, dScale * 2.2);
+            const maxH = 3980 * Math.max(1.5, dScale * 2.2);
+            const newW = Math.max(80, Math.min(maxW, this.viewBox.w * factor));
+            const newH = Math.max(60, Math.min(maxH, this.viewBox.h * factor));
 
             this.viewBox.x += (this.viewBox.w - newW) * relX;
             this.viewBox.y += (this.viewBox.h - newH) * relY;
@@ -2722,16 +3197,26 @@
             const g = document.getElementById("svgLayerGrid");
             if (!g) return;
             let html = "";
-            for (let x = 0; x <= 4500; x += 270) {
-                html += `<line x1="${x}" y1="0" x2="${x}" y2="3980" stroke="var(--grid-stroke)" stroke-width="1" />`;
+            const dScale = NetworkStore.distanceScale || 1.0;
+            const maxX = Math.max(5520, Math.round(5520 * dScale + 1200));
+            const maxY = Math.max(3980, Math.round(3980 * dScale + 1200));
+            const startX = Math.min(-1200, Math.round(2760 - (2760 * dScale) - 1200));
+            const startY = Math.min(-1200, Math.round(1990 - (1990 * dScale) - 1200));
+
+            for (let x = startX; x <= maxX; x += 270) {
+                html += `<line x1="${x}" y1="${startY}" x2="${x}" y2="${maxY}" stroke="var(--grid-stroke)" stroke-width="1" />`;
             }
-            for (let y = 0; y <= 3980; y += 270) {
-                html += `<line x1="0" y1="${y}" x2="4500" y2="${y}" stroke="var(--grid-stroke)" stroke-width="1" />`;
+            for (let y = startY; y <= maxY; y += 270) {
+                html += `<line x1="${startX}" y1="${y}" x2="${maxX}" y2="${y}" stroke="var(--grid-stroke)" stroke-width="1" />`;
             }
             g.innerHTML = html;
         },
 
         isLineVisible(line) {
+            if (!line) return false;
+            if (NetworkStore.hiddenLines && NetworkStore.hiddenLines.has(line.code)) {
+                return false;
+            }
             if (NetworkStore.isolatedLineCode && line.code !== NetworkStore.isolatedLineCode) {
                 return false;
             }
@@ -2751,8 +3236,10 @@
         },
 
         renderAll() {
+            this.renderGrid();
             this.renderCityOutlines();
             this.renderTracksAndStations();
+            this.renderCorridors();
             this.buildTrainNodes();
             this.renderEditHandles();
         },
@@ -2760,12 +3247,22 @@
         renderCityOutlines() {
             const g = document.getElementById("svgLayerCityOutlines");
             if (!g) return;
+            if (!NetworkStore.showCityOutlines) {
+                g.innerHTML = "";
+                return;
+            }
             let html = "";
             for (const zone of NetworkStore.cityOutlines) {
                 if (!zone.polygon_points || zone.polygon_points.length < 3) continue;
-                const pts = zone.polygon_points.map(p => `${p[0]},${p[1]}`).join(" ");
-                const cx = zone.polygon_points.reduce((acc, p) => acc + p[0], 0) / zone.polygon_points.length;
-                const cy = zone.polygon_points.reduce((acc, p) => acc + p[1], 0) / zone.polygon_points.length;
+                const pts = zone.polygon_points.map(p => {
+                    const sp = this.logicalToSvgCoords(p[0], p[1]);
+                    return `${sp.x.toFixed(1)},${sp.y.toFixed(1)}`;
+                }).join(" ");
+                const rawCx = zone.polygon_points.reduce((acc, p) => acc + p[0], 0) / zone.polygon_points.length;
+                const rawCy = zone.polygon_points.reduce((acc, p) => acc + p[1], 0) / zone.polygon_points.length;
+                const spCenter = this.logicalToSvgCoords(rawCx, rawCy);
+                const cx = spCenter.x;
+                const cy = spCenter.y;
                 const isWater = zone.zone_type === "water";
                 const waterClass = isWater ? " city-zone-water" : "";
                 const polyFill = isWater ? "#DCEEFA" : zone.color;
@@ -2853,33 +3350,76 @@
             return { ux: -1, uy: 0, isEndpoint: false };
         },
 
-        computeStationLabelPosition(st, radius, hasTopTerminalBadge = false) {
+        buildStationNeighborsCache() {
+            const cache = new Map();
+            for (const line of NetworkStore.lines) {
+                const stops = line.stops || [];
+                const n = stops.length;
+                for (let i = 0; i < n; i++) {
+                    const stId = stops[i].station_id;
+                    let entry = cache.get(stId);
+                    if (!entry) {
+                        entry = { avgDx: 0, avgDy: 0, count: 0 };
+                        cache.set(stId, entry);
+                    }
+                    const st = NetworkStore.stationsById.get(stId);
+                    if (!st) continue;
+                    if (i > 0) {
+                        const pSt = NetworkStore.stationsById.get(stops[i - 1].station_id);
+                        if (pSt) {
+                            entry.avgDx += Math.abs(st.x - pSt.x);
+                            entry.avgDy += Math.abs(st.y - pSt.y);
+                            entry.count++;
+                        }
+                    }
+                    if (i < n - 1) {
+                        const nSt = NetworkStore.stationsById.get(stops[i + 1].station_id);
+                        if (nSt) {
+                            entry.avgDx += Math.abs(nSt.x - st.x);
+                            entry.avgDy += Math.abs(nSt.y - st.y);
+                            entry.count++;
+                        }
+                    }
+                }
+            }
+            return cache;
+        },
+
+        computeStationLabelPosition(st, radius, hasTopTerminalBadge = false, neighborsCache = null) {
+            const sp = this.logicalToSvgCoords(st.x, st.y);
             if (hasTopTerminalBadge) {
-                return { x: st.x, y: st.y + radius + 15.0, anchor: "middle" };
+                return { x: sp.x, y: sp.y + radius + 15.0, anchor: "middle" };
             }
 
             let avgDx = 0;
             let avgDy = 0;
             let count = 0;
 
-            for (const line of NetworkStore.lines) {
-                const stops = line.stops || [];
-                for (let i = 0; i < stops.length; i++) {
-                    if (stops[i].station_id === st.id) {
-                        if (i > 0) {
-                            const pSt = NetworkStore.stationsById.get(stops[i - 1].station_id);
-                            if (pSt) {
-                                avgDx += Math.abs(st.x - pSt.x);
-                                avgDy += Math.abs(st.y - pSt.y);
-                                count++;
+            if (neighborsCache && neighborsCache.has(st.id)) {
+                const entry = neighborsCache.get(st.id);
+                avgDx = entry.avgDx;
+                avgDy = entry.avgDy;
+                count = entry.count;
+            } else {
+                for (const line of NetworkStore.lines) {
+                    const stops = line.stops || [];
+                    for (let i = 0; i < stops.length; i++) {
+                        if (stops[i].station_id === st.id) {
+                            if (i > 0) {
+                                const pSt = NetworkStore.stationsById.get(stops[i - 1].station_id);
+                                if (pSt) {
+                                    avgDx += Math.abs(st.x - pSt.x);
+                                    avgDy += Math.abs(st.y - pSt.y);
+                                    count++;
+                                }
                             }
-                        }
-                        if (i < stops.length - 1) {
-                            const nSt = NetworkStore.stationsById.get(stops[i + 1].station_id);
-                            if (nSt) {
-                                avgDx += Math.abs(nSt.x - st.x);
-                                avgDy += Math.abs(nSt.y - st.y);
-                                count++;
+                            if (i < stops.length - 1) {
+                                const nSt = NetworkStore.stationsById.get(stops[i + 1].station_id);
+                                if (nSt) {
+                                    avgDx += Math.abs(nSt.x - st.x);
+                                    avgDy += Math.abs(nSt.y - st.y);
+                                    count++;
+                                }
                             }
                         }
                     }
@@ -2887,19 +3427,19 @@
             }
 
             if (count === 0 || (avgDx === 0 && avgDy === 0)) {
-                return { x: st.x, y: st.y - (radius + 6.0), anchor: "middle" };
+                return { x: sp.x, y: sp.y - (radius + 6.0), anchor: "middle" };
             }
 
             const ratio = avgDy > 0 ? (avgDx / avgDy) : 999;
             if (ratio > 1.8) {
                 // Trazado predominantemente horizontal -> Etiqueta ARRIBA
-                return { x: st.x, y: st.y - (radius + 6.0), anchor: "middle" };
+                return { x: sp.x, y: sp.y - (radius + 6.0), anchor: "middle" };
             } else if (ratio < 0.55) {
                 // Trazado predominantemente vertical -> Etiqueta a la DERECHA
-                return { x: st.x + radius + 8.0, y: st.y + 4.0, anchor: "start" };
+                return { x: sp.x + radius + 8.0, y: sp.y + 4.0, anchor: "start" };
             } else {
                 // Trazado diagonal -> Etiqueta en DIAGONAL arriba-derecha
-                return { x: st.x + radius + 6.0, y: st.y - (radius + 4.0), anchor: "start" };
+                return { x: sp.x + radius + 6.0, y: sp.y - (radius + 4.0), anchor: "start" };
             }
         },
 
@@ -2959,8 +3499,14 @@
                         const baseWidth = (
                             line.code === "A" ? 21.0 : (isBrt ? 13.8 : (isFeeder ? 13.4 : 15.8))
                         ) * widthScale;
+                        const p1 = this.logicalToSvgCoords(st1.x, st1.y);
+                        const p2 = this.logicalToSvgCoords(st2.x, st2.y);
                         const wps = Array.isArray(s1.waypoints) ? s1.waypoints : [];
-                        const polyPts = [[st1.x, st1.y], ...wps, [st2.x, st2.y]].map(p => `${p[0]},${p[1]}`).join(" ");
+                        const scaledWps = wps.map(wp => {
+                            const spWp = this.logicalToSvgCoords(wp[0], wp[1]);
+                            return [spWp.x, spWp.y];
+                        });
+                        const polyPts = [[p1.x, p1.y], ...scaledWps, [p2.x, p2.y]].map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 
                         if (NetworkStore.editMode && visible && matchesInfra) {
                             trackHitsHtml += `
@@ -3044,8 +3590,10 @@
             let tagsHtml = "";
             let labelsHtml = "";
             const placedTerminalCenters = [];
+            const neighborsCache = this.buildStationNeighborsCache();
 
             for (const st of NetworkStore.stations) {
+                const sp = this.logicalToSvgCoords(st.x, st.y);
                 const isVis = visibleStationIds.has(st.id);
                 const stOpacity = isVis ? 1.0 : 0.12;
                 const isSelected = st.id === NetworkStore.selectedStationId;
@@ -3075,9 +3623,9 @@
                     const innerStroke = isSelected ? "#0055A4" : (st.custom_color || (primaryLine ? primaryLine.color : "#1E293B"));
                     stationsHtml += `
                         <g class="svg-station-node transfer-node${orphanClass}" data-station-id="${st.id}" opacity="${stOpacity}">
-                            <circle cx="${st.x}" cy="${st.y}" r="${outerR}"
+                            <circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="${outerR}"
                                 fill="#FFFFFF" stroke="${outerStroke}" stroke-width="${strokeW}"${dashAttr} />
-                            <circle cx="${st.x}" cy="${st.y}" r="${innerR}"
+                            <circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="${innerR}"
                                 fill="${fill}" stroke="${innerStroke}" stroke-width="1.8" />
                             <title>${escapeHtml(st.name)} · Nodo de Correspondencia (${(Array.isArray(st.lines) ? st.lines : []).join(", ")})${orphanHint}</title>
                         </g>
@@ -3086,7 +3634,7 @@
                     const half = radius * 0.95;
                     stationsHtml += `
                         <rect class="svg-station-node${orphanClass}" data-station-id="${st.id}"
-                            x="${(st.x - half).toFixed(1)}" y="${(st.y - half).toFixed(1)}"
+                            x="${(sp.x - half).toFixed(1)}" y="${(sp.y - half).toFixed(1)}"
                             width="${(half * 2).toFixed(1)}" height="${(half * 2).toFixed(1)}" rx="2.5"
                             fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"${dashAttr}
                             opacity="${stOpacity}">
@@ -3096,7 +3644,7 @@
                 } else {
                     stationsHtml += `
                         <circle class="svg-station-node${orphanClass}" data-station-id="${st.id}"
-                            cx="${st.x}" cy="${st.y}" r="${radius}"
+                            cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="${radius}"
                             fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"${dashAttr}
                             opacity="${stOpacity}">
                             <title>${escapeHtml(st.name)}${orphanHint}</title>
@@ -3106,7 +3654,7 @@
 
                 if (isClosed && isVis) {
                     stationsHtml += `
-                        <path d="M ${st.x - 4.8} ${st.y - 4.8} L ${st.x + 4.8} ${st.y + 4.8} M ${st.x + 4.8} ${st.y - 4.8} L ${st.x - 4.8} ${st.y + 4.8}"
+                        <path d="M ${sp.x - 4.8} ${sp.y - 4.8} L ${sp.x + 4.8} ${sp.y + 4.8} M ${sp.x + 4.8} ${sp.y - 4.8} L ${sp.x - 4.8} ${sp.y + 4.8}"
                             stroke="#9B2C2C" stroke-width="2.2" pointer-events="none" />
                     `;
                 }
@@ -3126,16 +3674,16 @@
                         const rBadge = isBrtBadge ? 17.5 : 16.2;
                         const dist = radius + rBadge + 7.5;
 
-                        let bx = st.x + ux * dist;
-                        let by = st.y + uy * dist;
+                        let bx = sp.x + ux * dist;
+                        let by = sp.y + uy * dist;
 
                         // Evitar colisión si dos líneas tienen terminal en la misma estación o muy cerca
                         const perpX = -uy;
                         const perpY = ux;
                         const candidateOffsets = [0, 34, -34, 68, -68];
                         for (const off of candidateOffsets) {
-                            const cx = st.x + ux * dist + perpX * off;
-                            const cy = st.y + uy * dist + perpY * off;
+                            const cx = sp.x + ux * dist + perpX * off;
+                            const cy = sp.y + uy * dist + perpY * off;
                             const collides = placedTerminalCenters.some(
                                 p => Math.hypot(p[0] - cx, p[1] - cy) < 32.5
                             );
@@ -3147,16 +3695,16 @@
                         }
                         placedTerminalCenters.push([bx, by]);
 
-                        if (bx > st.x + 10 && Math.abs(by - st.y) < 20) {
+                        if (bx > sp.x + 10 && Math.abs(by - sp.y) < 20) {
                             rightBadgeMaxX = Math.max(rightBadgeMaxX, bx + rBadge);
                         }
-                        if (by < st.y - 12 && Math.abs(bx - st.x) < 22) {
+                        if (by < sp.y - 12 && Math.abs(bx - sp.x) < 22) {
                             hasTopTerminalBadge = true;
                         }
 
                         const fgText = getBadgeTextColor(tLine.color, tLine.text_color || "#FFFFFF");
-                        const stubStartX = (st.x + ux * (radius + 0.5)).toFixed(1);
-                        const stubStartY = (st.y + uy * (radius + 0.5)).toFixed(1);
+                        const stubStartX = (sp.x + ux * (radius + 0.5)).toFixed(1);
+                        const stubStartY = (sp.y + uy * (radius + 0.5)).toFixed(1);
                         const stubHtml = isEndpoint ? `
                             <line x1="${stubStartX}" y1="${stubStartY}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}"
                                   stroke="${tLine.color}" stroke-width="${(Math.min(13, 11.5 * widthScale)).toFixed(1)}"
@@ -3196,8 +3744,8 @@
                 if (Array.isArray(st.icon_tags) && st.icon_tags.length > 0) {
                     const validTags = st.icon_tags.map(tid => STATION_ICON_TAGS_MAP.get(tid)).filter(Boolean);
                     if (validTags.length > 0) {
-                        const baseTx = Math.max(st.x + radius + 5.2, rightBadgeMaxX > 0 ? rightBadgeMaxX + 5.5 : 0);
-                        const baseTy = st.y - 8.0;
+                        const baseTx = Math.max(sp.x + radius + 5.2, rightBadgeMaxX > 0 ? rightBadgeMaxX + 5.5 : 0);
+                        const baseTy = sp.y - 8.0;
                         validTags.forEach((tagDef, tIdx) => {
                             const tx = (baseTx + tIdx * 18.0).toFixed(1);
                             const ty = baseTy.toFixed(1);
@@ -3220,7 +3768,7 @@
                     const showLabel = st.is_transfer || st.is_terminal || hasTerm || st.is_premium_stop || isClosed || hasTags || Boolean(NetworkStore.isolatedLineCode);
                     if (showLabel) {
                         const fontSize = (st.is_transfer || hasTerm) ? 11.8 : 10.0;
-                        const pos = this.computeStationLabelPosition(st, radius, hasTopTerminalBadge);
+                        const pos = this.computeStationLabelPosition(st, radius, hasTopTerminalBadge, neighborsCache);
                         labelsHtml += `
                             <text x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}"
                                 font-size="${fontSize}" font-weight="${(st.is_transfer || hasTerm) ? 700 : 600}"
@@ -3235,6 +3783,64 @@
             if (terminalBadgesLayer) terminalBadgesLayer.innerHTML = terminalBadgesHtml;
             if (tagsLayer) tagsLayer.innerHTML = tagsHtml;
             labelsLayer.innerHTML = labelsHtml;
+            this.renderCorridors();
+        },
+
+        renderCorridors() {
+            const corridorsLayer = document.getElementById("svgLayerCorridors");
+            if (!corridorsLayer) return;
+
+            let html = "";
+            for (const corridor of NetworkStore.transferCorridors) {
+                const s1Id = corridor.from_station_id || corridor.fromStationId;
+                const s2Id = corridor.to_station_id || corridor.toStationId;
+                const st1 = NetworkStore.stationsById.get(s1Id);
+                const st2 = NetworkStore.stationsById.get(s2Id);
+                if (!st1 || !st2) continue;
+
+                // Si todas las líneas de ambas estaciones están ocultas, atenuar pasillo
+                const st1Lines = Array.isArray(st1.lines) ? st1.lines : [];
+                const st2Lines = Array.isArray(st2.lines) ? st2.lines : [];
+                const allSt1Hidden = st1Lines.length > 0 && st1Lines.every(c => NetworkStore.isLineHidden(c));
+                const allSt2Hidden = st2Lines.length > 0 && st2Lines.every(c => NetworkStore.isLineHidden(c));
+                const isDimmed = allSt1Hidden && allSt2Hidden;
+                const opacity = isDimmed ? 0.08 : 1.0;
+
+                const p1 = this.logicalToSvgCoords(st1.x, st1.y);
+                const p2 = this.logicalToSvgCoords(st2.x, st2.y);
+                const wps = Array.isArray(corridor.waypoints) ? corridor.waypoints : [];
+                const scaledWps = wps.map(wp => {
+                    const spWp = this.logicalToSvgCoords(wp[0], wp[1]);
+                    return [spWp.x, spWp.y];
+                });
+                const pts = [[p1.x, p1.y], ...scaledWps, [p2.x, p2.y]];
+                const ptsStr = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                const distMeters = corridor.distance_meters || Math.round(Math.hypot(st2.x - st1.x, st2.y - st1.y) * 4);
+                const walkMin = corridor.walking_minutes || Math.max(1, Math.round(distMeters / 60));
+
+                html += `
+                    <g class="svg-transfer-corridor" data-corridor-id="${corridor.id}" opacity="${opacity}">
+                        <title>Pasillo de correspondencia: ${escapeHtml(st1.name)} ⇄ ${escapeHtml(st2.name)} (${distMeters}m · ~${walkMin} min)</title>
+                        <polyline class="corridor-casing" points="${ptsStr}" stroke-width="15.5" fill="none" />
+                        <polyline class="corridor-fill" points="${ptsStr}" stroke-width="10.0" fill="none" />
+                        <polyline class="corridor-walkway" points="${ptsStr}" stroke-width="2.2" fill="none" />
+                        <g class="corridor-badge" transform="translate(${midX.toFixed(1)}, ${midY.toFixed(1)})">
+                            <rect x="-48" y="-9" width="96" height="18" rx="9" />
+                            <text x="0" y="0" dy="0.35em" text-anchor="middle">🚶 ${distMeters}m · ${walkMin}m</text>
+                        </g>
+                        ${NetworkStore.editMode ? `
+                            <g class="corridor-delete-btn" data-action="delete-corridor" data-corridor-id="${corridor.id}" transform="translate(${(midX + 58).toFixed(1)}, ${midY.toFixed(1)})">
+                                <circle cx="0" cy="0" r="7.5" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5" />
+                                <text x="0" y="0" dy="0.35em" text-anchor="middle" fill="#FFFFFF" font-size="10" font-weight="bold">×</text>
+                            </g>
+                        ` : ''}
+                    </g>
+                `;
+            }
+            corridorsLayer.innerHTML = html;
         },
 
         buildTrainNodes() {
@@ -3291,9 +3897,10 @@
                 }
                 g.removeAttribute("display");
                 const scale = (train.id === NetworkStore.selectedTrainId) ? 1.45 : 1.0;
+                const sp = this.logicalToSvgCoords(train.x, train.y);
                 g.setAttribute(
                     "transform",
-                    `translate(${train.x.toFixed(1)}, ${train.y.toFixed(1)}) rotate(${train.angleDeg.toFixed(1)}) scale(${scale})`
+                    `translate(${sp.x.toFixed(1)}, ${sp.y.toFixed(1)}) rotate(${train.angleDeg.toFixed(1)}) scale(${scale})`
                 );
             }
         },
@@ -3327,41 +3934,43 @@
         },
 
         snapPointOctilinear(anchor, target) {
-            const ax = Number(anchor[0]);
-            const ay = Number(anchor[1]);
-            const tx = Number(target[0]);
-            const ty = Number(target[1]);
+            const ax = Math.round(Number(anchor[0] !== undefined ? anchor[0] : anchor.x) * 2) / 2;
+            const ay = Math.round(Number(anchor[1] !== undefined ? anchor[1] : anchor.y) * 2) / 2;
+            const tx = Number(target[0] !== undefined ? target[0] : target.x);
+            const ty = Number(target[1] !== undefined ? target[1] : target.y);
             const dx = tx - ax;
             const dy = ty - ay;
             const dist = Math.hypot(dx, dy);
-            if (dist < 1.0) return [Math.round(tx * 2) / 2, Math.round(ty * 2) / 2];
+            if (dist < 1.0) return [ax, ay];
 
             let deg = (Math.atan2(dy, dx) * 180 / Math.PI) % 360;
             if (deg < 0) deg += 360;
+            // Limitar estrictamente a múltiplos de 45°: (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315° y 360°/0°)
             const oct = Math.round(deg / 45) % 8;
 
-            const dDiag = Math.round((dist * 0.7071067811865476) * 2) / 2;
             const dOrtho = Math.round(dist * 2) / 2;
+            // En trazados de metro diagonales, para que no queden desalineadas, |dx| y |dy| deben ser exactamente iguales
+            const dDiag = Math.round(((Math.abs(dx) + Math.abs(dy)) / 2) * 2) / 2;
 
             switch (oct) {
-                case 0: // 0° Este (Horizontal derecha)
-                    return [Math.round((ax + dOrtho) * 2) / 2, ay];
-                case 1: // 45° Sur-Este (Diagonal abajo-derecha)
-                    return [Math.round((ax + dDiag) * 2) / 2, Math.round((ay + dDiag) * 2) / 2];
-                case 2: // 90° Sur (Vertical abajo)
-                    return [ax, Math.round((ay + dOrtho) * 2) / 2];
-                case 3: // 135° Sur-Oeste (Diagonal abajo-izquierda)
-                    return [Math.round((ax - dDiag) * 2) / 2, Math.round((ay + dDiag) * 2) / 2];
-                case 4: // 180° Oeste (Horizontal izquierda)
-                    return [Math.round((ax - dOrtho) * 2) / 2, ay];
-                case 5: // 225° Norte-Oeste (Diagonal arriba-izquierda)
-                    return [Math.round((ax - dDiag) * 2) / 2, Math.round((ay - dDiag) * 2) / 2];
-                case 6: // 270° Norte (Vertical arriba)
-                    return [ax, Math.round((ay - dOrtho) * 2) / 2];
-                case 7: // 315° Norte-Este (Diagonal arriba-derecha)
-                    return [Math.round((ax + dDiag) * 2) / 2, Math.round((ay - dDiag) * 2) / 2];
+                case 0: // 0° Este (Horizontal derecha: dy = 0)
+                    return [ax + dOrtho, ay];
+                case 1: // 45° Sur-Este (Diagonal abajo-derecha: dx = dDiag, dy = dDiag)
+                    return [ax + dDiag, ay + dDiag];
+                case 2: // 90° Sur (Vertical abajo: dx = 0)
+                    return [ax, ay + dOrtho];
+                case 3: // 135° Sur-Oeste (Diagonal abajo-izquierda: -dx = dDiag, dy = dDiag)
+                    return [ax - dDiag, ay + dDiag];
+                case 4: // 180° Oeste (Horizontal izquierda: dy = 0)
+                    return [ax - dOrtho, ay];
+                case 5: // 225° Norte-Oeste (Diagonal arriba-izquierda: -dx = dDiag, -dy = dDiag)
+                    return [ax - dDiag, ay - dDiag];
+                case 6: // 270° Norte (Vertical arriba: dx = 0)
+                    return [ax, ay - dOrtho];
+                case 7: // 315° Norte-Este (Diagonal arriba-derecha: dx = dDiag, -dy = dDiag)
+                    return [ax + dDiag, ay - dDiag];
                 default:
-                    return [tx, ty];
+                    return [Math.round(tx * 2) / 2, Math.round(ty * 2) / 2];
             }
         },
 
@@ -3454,6 +4063,152 @@
             return best ? [best.x, best.y] : [Math.round(mx * 2) / 2, Math.round(my * 2) / 2];
         },
 
+        getStationNeighbors(stId) {
+            const neighbors = [];
+            const seen = new Set();
+            for (const ln of NetworkStore.lines) {
+                if (!Array.isArray(ln.stops)) continue;
+                const stops = ln.stops;
+                const n = stops.length;
+                for (let i = 0; i < n; i++) {
+                    if (stops[i].station_id === stId) {
+                        if (i > 0) {
+                            const pSt = NetworkStore.stationsById.get(stops[i - 1].station_id);
+                            if (pSt && !seen.has(pSt.id)) {
+                                seen.add(pSt.id);
+                                neighbors.push({ station: pSt, lineCode: ln.code, isPrev: true });
+                            }
+                        } else if (ln.is_circular && n > 1) {
+                            const pSt = NetworkStore.stationsById.get(stops[n - 1].station_id);
+                            if (pSt && !seen.has(pSt.id)) {
+                                seen.add(pSt.id);
+                                neighbors.push({ station: pSt, lineCode: ln.code, isPrev: true });
+                            }
+                        }
+                        if (i < n - 1) {
+                            const nSt = NetworkStore.stationsById.get(stops[i + 1].station_id);
+                            if (nSt && !seen.has(nSt.id)) {
+                                seen.add(nSt.id);
+                                neighbors.push({ station: nSt, lineCode: ln.code, isNext: true });
+                            }
+                        } else if (ln.is_circular && n > 1) {
+                            const nSt = NetworkStore.stationsById.get(stops[0].station_id);
+                            if (nSt && !seen.has(nSt.id)) {
+                                seen.add(nSt.id);
+                                neighbors.push({ station: nSt, lineCode: ln.code, isNext: true });
+                            }
+                        }
+                    }
+                }
+            }
+            return neighbors;
+        },
+
+        getStationAutoAlignedCoords(st, rawX, rawY, snapThreshold = 18.0) {
+            const rx = Number(rawX);
+            const ry = Number(rawY);
+            const neighborEntries = this.getStationNeighbors(st.id);
+            if (!neighborEntries || neighborEntries.length === 0) {
+                return [Math.round(rx * 2) / 2, Math.round(ry * 2) / 2];
+            }
+
+            const neighbors = neighborEntries.map(e => e.station);
+            const candidates = [];
+
+            const addCandidate = (cx, cy, label = "") => {
+                const x = Math.round(Number(cx) * 2) / 2;
+                const y = Math.round(Number(cy) * 2) / 2;
+                if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+                if (!candidates.some(c => c.x === x && c.y === y)) {
+                    candidates.push({ x, y, label });
+                }
+            };
+
+            // 1. Rayos canónicos directos (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°) desde cada vecino
+            for (const nb of neighbors) {
+                const octPt = this.snapPointOctilinear([nb.x, nb.y], [rx, ry]);
+                addCandidate(octPt[0], octPt[1], "direct_octilinear");
+                addCandidate(nb.x, ry, "share_x");
+                addCandidate(rx, nb.y, "share_y");
+            }
+
+            // 2. Analizar relaciones entre pares de vecinos (esquinas a 90°, diagonales y colineales)
+            for (let i = 0; i < neighbors.length; i++) {
+                for (let j = i + 1; j < neighbors.length; j++) {
+                    const n1 = neighbors[i];
+                    const n2 = neighbors[j];
+
+                    // Esquinas ortogonales puras a 90°
+                    addCandidate(n2.x, n1.y, "corner_90_a");
+                    addCandidate(n1.x, n2.y, "corner_90_b");
+
+                    // Colineal horizontal si n1 y n2 tienen Y idéntica o muy cercana
+                    if (Math.abs(n1.y - n2.y) <= 12.0) {
+                        const midY = (n1.y + n2.y) / 2;
+                        addCandidate(rx, midY, "collinear_horiz");
+                        addCandidate((n1.x + n2.x) / 2, midY, "collinear_horiz_mid");
+                    }
+
+                    // Colineal vertical si n1 y n2 tienen X idéntica o muy cercana
+                    if (Math.abs(n1.x - n2.x) <= 12.0) {
+                        const midX = (n1.x + n2.x) / 2;
+                        addCandidate(midX, ry, "collinear_vert");
+                        addCandidate(midX, (n1.y + n2.y) / 2, "collinear_vert_mid");
+                    }
+
+                    // Colineal diagonal a 45° si n1 y n2 tienen pendiente ~ 1 o -1
+                    const ndx = n2.x - n1.x;
+                    const ndy = n2.y - n1.y;
+                    if (Math.abs(Math.abs(ndx) - Math.abs(ndy)) <= 12.0 && Math.abs(ndx) > 6.0) {
+                        const m = (ndx * ndy > 0) ? 1 : -1;
+                        const projX = (rx + n1.x + m * (ry - n1.y)) / 2;
+                        const projY = n1.y + m * (projX - n1.x);
+                        addCandidate(projX, projY, "collinear_diag");
+                        addCandidate((n1.x + n2.x) / 2, (n1.y + n2.y) / 2, "collinear_diag_mid");
+                    }
+                }
+            }
+
+            // Función evaluadora: verifica cuántos vecinos están en ángulos estrictos (0°, 45°, 90°, 135°, ...)
+            const isOctilinear = (x1, y1, x2, y2) => {
+                const dx = Math.abs(x1 - x2);
+                const dy = Math.abs(y1 - y2);
+                if (dx < 0.001 || dy < 0.001) return true; // 0°, 90°, 180°, 270°
+                return Math.abs(dx - dy) < 0.001; // 45°, 135°, 225°, 315°
+            };
+
+            let bestCandidate = null;
+            let bestScore = -Infinity;
+
+            for (const cand of candidates) {
+                const dist = Math.hypot(cand.x - rx, cand.y - ry);
+                if (snapThreshold !== null && dist > snapThreshold) {
+                    continue;
+                }
+
+                let alignedNeighborsCount = 0;
+                for (const nb of neighbors) {
+                    if (isOctilinear(cand.x, cand.y, nb.x, nb.y)) {
+                        alignedNeighborsCount++;
+                    }
+                }
+
+                // Puntuación: dar enorme peso a tener el mayor número de vecinos perfectamente rectos/a 45°,
+                // y como desempate la menor distancia a la posición deseada
+                const score = (alignedNeighborsCount * 1000) - dist;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCandidate = cand;
+                }
+            }
+
+            if (bestCandidate) {
+                return [bestCandidate.x, bestCandidate.y];
+            }
+
+            return [Math.round(rx * 2) / 2, Math.round(ry * 2) / 2];
+        },
+
         async persistSegmentWaypoints(stopObj, lineCode) {
             if (!stopObj || !stopObj.id) return;
             try {
@@ -3508,17 +4263,20 @@
                 return;
             }
             let html = "";
-            // 1. Vértices cuadrados de polígonos urbanos
-            for (const zone of NetworkStore.cityOutlines) {
-                if (!zone.polygon_points) continue;
-                zone.polygon_points.forEach((pt, idx) => {
-                    html += `
-                        <rect class="svg-city-handle"
-                            data-zone-id="${zone.id}" data-vertex-idx="${idx}"
-                            x="${pt[0] - 8}" y="${pt[1] - 8}" width="16" height="16" rx="3"
-                            fill="#0055A4" stroke="#FFFFFF" stroke-width="2.2" />
-                    `;
-                });
+            // 1. Vértices cuadrados de polígonos urbanos (solo si la capa de cartografía está activa)
+            if (NetworkStore.showCityOutlines) {
+                for (const zone of NetworkStore.cityOutlines) {
+                    if (!zone.polygon_points) continue;
+                    zone.polygon_points.forEach((pt, idx) => {
+                        const sp = this.logicalToSvgCoords(pt[0], pt[1]);
+                        html += `
+                            <rect class="svg-city-handle"
+                                data-zone-id="${zone.id}" data-vertex-idx="${idx}"
+                                x="${(sp.x - 8).toFixed(1)}" y="${(sp.y - 8).toFixed(1)}" width="16" height="16" rx="3"
+                                fill="#0055A4" stroke="#FFFFFF" stroke-width="2.2" />
+                        `;
+                    });
+                }
             }
 
             // 2. Vértices de los trazos (waypoints): Visibles en Modo Edición para manipular a conveniencia
@@ -3530,6 +4288,7 @@
                     if (!this.isSegmentMatchingInfraFilter(stop)) continue;
                     const wps = Array.isArray(stop.waypoints) ? stop.waypoints : [];
                     wps.forEach((pt, wpIdx) => {
+                        const sp = this.logicalToSvgCoords(pt[0], pt[1]);
                         const r = isActiveLine ? 8.0 : 6.4;
                         const strokeW = isActiveLine ? 2.8 : 2.0;
                         html += `
@@ -3537,7 +4296,7 @@
                                 data-line-code="${escapeHtml(line.code)}"
                                 data-ls-id="${stop.id}"
                                 data-wp-idx="${wpIdx}"
-                                cx="${pt[0]}" cy="${pt[1]}" r="${r}"
+                                cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="${r}"
                                 fill="${line.color}" stroke="#FFFFFF" stroke-width="${strokeW}">
                                 <title>Vértice Línea ${escapeHtml(line.name)} (Arrastra para moldear a 45°/90° · Clic derecho o doble clic para eliminar)</title>
                             </circle>
@@ -3563,6 +4322,7 @@
                 g.innerHTML = "";
                 return;
             }
+            const sp1 = this.logicalToSvgCoords(st1.x, st1.y);
 
             // Detectar si está sobre una estación destino existente (snap a estación)
             let snapTarget = null;
@@ -3571,10 +4331,11 @@
 
             for (const st of NetworkStore.stations) {
                 if (st.id === st1.id) continue;
-                const dist = Math.hypot(st.x - mouseSvgPt.x, st.y - mouseSvgPt.y);
+                const sp = this.logicalToSvgCoords(st.x, st.y);
+                const dist = Math.hypot(sp.x - mouseSvgPt.x, sp.y - mouseSvgPt.y);
                 if (dist < closestDist) {
                     closestDist = dist;
-                    snapTarget = [st.x, st.y];
+                    snapTarget = [sp.x, sp.y];
                     hoveredStId = st.id;
                 }
             }
@@ -3587,7 +4348,7 @@
 
             if (!snapTarget) {
                 // Snap octilineal a 45°/90° respecto a st1
-                snapTarget = this.snapPointOctilinear([st1.x, st1.y], [mouseSvgPt.x, mouseSvgPt.y]);
+                snapTarget = this.snapPointOctilinear([sp1.x, sp1.y], [mouseSvgPt.x, mouseSvgPt.y]);
             }
 
             const targetSt = hoveredStId ? NetworkStore.stationsById.get(hoveredStId) : null;
@@ -3596,10 +4357,10 @@
             const strokeColor = ln ? ln.color : "#0055A4";
 
             g.innerHTML = `
-                <line x1="${st1.x}" y1="${st1.y}" x2="${snapTarget[0]}" y2="${snapTarget[1]}"
+                <line x1="${sp1.x.toFixed(1)}" y1="${sp1.y.toFixed(1)}" x2="${snapTarget[0].toFixed(1)}" y2="${snapTarget[1].toFixed(1)}"
                     stroke="${strokeColor}" stroke-width="8" opacity="0.25" stroke-linecap="round" />
                 <line class="svg-rubber-band-line"
-                    x1="${st1.x}" y1="${st1.y}" x2="${snapTarget[0]}" y2="${snapTarget[1]}"
+                    x1="${sp1.x.toFixed(1)}" y1="${sp1.y.toFixed(1)}" x2="${snapTarget[0].toFixed(1)}" y2="${snapTarget[1].toFixed(1)}"
                     stroke="${strokeColor}" stroke-width="4.5" stroke-dasharray="8,5" stroke-linecap="round" />
                 <circle class="svg-rubber-band-point"
                     cx="${snapTarget[0]}" cy="${snapTarget[1]}" r="6.5"
@@ -3699,6 +4460,13 @@
                     e.stopPropagation();
                     const stId = Number(stEl.dataset.stationId);
                     VisualEditorTools.handleStationClickForCorrespondence(stId);
+                    return;
+                }
+
+                if (VisualEditorTools.activeTool === "add_corridor" && stEl && e.button === 0) {
+                    e.stopPropagation();
+                    const stId = Number(stEl.dataset.stationId);
+                    VisualEditorTools.handleStationClickForCorridor(stId);
                     return;
                 }
 
@@ -3884,59 +4652,11 @@
                 }
 
                 if (this.dragTarget) {
+                    const logicalPt = this.svgToLogicalCoords(svgPt.x, svgPt.y);
                     if (this.dragTarget.type === "station") {
                         const st = NetworkStore.stationsById.get(this.dragTarget.id);
                         if (st) {
-                            let targetX = Math.round(svgPt.x * 2) / 2;
-                            let targetY = Math.round(svgPt.y * 2) / 2;
-
-                            // Snap magnético inteligente respecto a estaciones vecinas en líneas conectadas
-                            const connectedStations = [];
-                            for (const ln of NetworkStore.lines) {
-                                if (!Array.isArray(ln.stops)) continue;
-                                for (let i = 0; i < ln.stops.length; i++) {
-                                    if (ln.stops[i].station_id === st.id) {
-                                        if (i > 0) {
-                                            const prevSt = NetworkStore.stationsById.get(ln.stops[i - 1].station_id);
-                                            if (prevSt && !connectedStations.some(cs => cs.id === prevSt.id)) connectedStations.push(prevSt);
-                                        }
-                                        if (i < ln.stops.length - 1) {
-                                            const nextSt = NetworkStore.stationsById.get(ln.stops[i + 1].station_id);
-                                            if (nextSt && !connectedStations.some(cs => cs.id === nextSt.id)) connectedStations.push(nextSt);
-                                        }
-                                    }
-                                }
-                            }
-
-                            const SNAP_THRESH = 16.0;
-                            let snappedHoriz = false;
-                            let snappedVert = false;
-
-                            for (const nb of connectedStations) {
-                                if (!snappedHoriz && Math.abs(svgPt.y - nb.y) <= SNAP_THRESH) {
-                                    targetY = nb.y;
-                                    snappedHoriz = true;
-                                }
-                                if (!snappedVert && Math.abs(svgPt.x - nb.x) <= SNAP_THRESH) {
-                                    targetX = nb.x;
-                                    snappedVert = true;
-                                }
-                            }
-
-                            // Si no se alineó horizontal/verticalmente, checar snap diagonal a 45° con vecinos
-                            if (!snappedHoriz && !snappedVert) {
-                                for (const nb of connectedStations) {
-                                    const cdx = svgPt.x - nb.x;
-                                    const cdy = svgPt.y - nb.y;
-                                    if (Math.abs(Math.abs(cdx) - Math.abs(cdy)) <= SNAP_THRESH) {
-                                        const diagDist = (Math.abs(cdx) + Math.abs(cdy)) / 2;
-                                        targetX = Math.round((nb.x + Math.sign(cdx || 1) * diagDist) * 2) / 2;
-                                        targetY = Math.round((nb.y + Math.sign(cdy || 1) * diagDist) * 2) / 2;
-                                        break;
-                                    }
-                                }
-                            }
-
+                            const [targetX, targetY] = this.getStationAutoAlignedCoords(st, logicalPt.x, logicalPt.y, 18.0);
                             st.x = targetX;
                             st.y = targetY;
                             st.lat = Number(lat);
@@ -3966,7 +4686,7 @@
                             const prevAnchor = wpIdx > 0 ? stopObj.waypoints[wpIdx - 1] : (st1 ? [st1.x, st1.y] : null);
                             const nextAnchor = wpIdx < stopObj.waypoints.length - 1 ? stopObj.waypoints[wpIdx + 1] : (st2 ? [st2.x, st2.y] : null);
 
-                            const nextPt = this.snapWaypoint(prevAnchor, nextAnchor, [svgPt.x, svgPt.y]);
+                            const nextPt = this.snapWaypoint(prevAnchor, nextAnchor, [logicalPt.x, logicalPt.y]);
                             stopObj.waypoints[wpIdx] = nextPt;
                             this.dragTarget.moved = true;
                             this.scheduleDragRender();
@@ -3975,8 +4695,8 @@
                         const zone = NetworkStore.cityOutlines.find(z => z.id === this.dragTarget.id);
                         if (zone && zone.polygon_points[this.dragTarget.vertexIdx]) {
                             zone.polygon_points[this.dragTarget.vertexIdx] = [
-                                Math.round(svgPt.x),
-                                Math.round(svgPt.y)
+                                Math.round(logicalPt.x),
+                                Math.round(logicalPt.y)
                             ];
                             this.scheduleDragRender();
                         }
@@ -4004,7 +4724,13 @@
                         if (st) {
                             if (target.moved) {
                                 this.renderTracksAndStations();
-                                await ApiClient.post(`/api/stations/${st.id}/update/`, { x: st.x, y: st.y });
+                                await ApiClient.post(`/api/stations/${st.id}/update/`, {
+                                    name: st.name,
+                                    x: st.x,
+                                    y: st.y,
+                                    lat: st.lat,
+                                    lng: st.lng
+                                });
                                 HistoryManager.push({
                                     type: "move_station",
                                     stationId: st.id,
@@ -4087,17 +4813,19 @@
             TrainSimulationEngine.geoTrainMarkers.clear();
 
             // 1. Polígonos geográficos de la ciudad ficticia (Proyección Equirectangular Tangente Local 54 u/km)
-            for (const zone of NetworkStore.cityOutlines) {
-                const latlngs = zone.polygon_points.map(pt => [
-                    19.420000 + ((1860.0 - pt[1]) / 54.0) / 111.195080,
-                    -99.140000 + ((pt[0] - 2120.0) / 54.0) / 104.868820
-                ]);
-                L.polygon(latlngs, {
-                    color: "#64748B",
-                    weight: 1.5,
-                    fillColor: zone.color,
-                    fillOpacity: 0.45
-                }).bindTooltip(`${zone.name} (${zone.elevation_m} m s.n.m.)`).addTo(this.layerGroup);
+            if (NetworkStore.showCityOutlines) {
+                for (const zone of NetworkStore.cityOutlines) {
+                    const latlngs = zone.polygon_points.map(pt => [
+                        19.420000 + ((1860.0 - pt[1]) / 54.0) / 111.195080,
+                        -99.140000 + ((pt[0] - 2120.0) / 54.0) / 104.868820
+                    ]);
+                    L.polygon(latlngs, {
+                        color: "#64748B",
+                        weight: 1.5,
+                        fillColor: zone.color,
+                        fillOpacity: 0.45
+                    }).bindTooltip(`${zone.name} (${zone.elevation_m} m s.n.m.)`).addTo(this.layerGroup);
+                }
             }
 
             // 2. Líneas y estaciones en coordenadas (lat, lng)
@@ -4423,13 +5151,19 @@
                 return true;
             });
 
+            const visibleCount = filtered.filter(l => !NetworkStore.isLineHidden(l.code)).length;
             const countLbl = document.getElementById("linesCountLabel");
-            if (countLbl) countLbl.textContent = `DIRECTORIO DE LÍNEAS (${filtered.length})`;
+            if (countLbl) {
+                countLbl.textContent = NetworkStore.hiddenLines.size > 0
+                    ? `DIRECTORIO DE LÍNEAS (${visibleCount}/${filtered.length} vis)`
+                    : `DIRECTORIO DE LÍNEAS (${filtered.length})`;
+            }
 
             let html = "";
             for (const ln of filtered) {
                 const isSelected = NetworkStore.isolatedLineCode === ln.code;
                 const isDimmed = NetworkStore.isolatedLineCode && !isSelected;
+                const isHidden = NetworkStore.isLineHidden(ln.code);
                 const isBrt = ln.network_type === "bus_articulado";
                 const freqText = ln.premium_frequency_seconds
                     ? `Ord ${ln.frequency_seconds}s · Prem ${ln.premium_frequency_seconds}s`
@@ -4445,7 +5179,17 @@
                         <div class="line-card-body">
                             <div class="line-card-top">
                                 <span class="line-card-title">${escapeHtml(ln.route_title)}</span>
-                                <span class="status-dot ${ln.status}" title="${escapeHtml(ln.status_label)}"></span>
+                                <div class="line-card-actions" style="display:flex; align-items:center; gap:6px;">
+                                    <button type="button" class="line-vis-btn ${isHidden ? 'hidden-state' : ''}"
+                                            data-action="toggle-line-vis" data-line-code="${escapeHtml(ln.code)}"
+                                            title="${isHidden ? 'Mostrar línea en el plano' : 'Ocultar línea del plano'}">
+                                        ${isHidden
+                                            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
+                                            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
+                                        }
+                                    </button>
+                                    <span class="status-dot ${ln.status}" title="${escapeHtml(ln.status_label)}"></span>
+                                </div>
                             </div>
                             <div class="line-card-meta tabular">
                                 <span>${ln.operational_stations_count}/${ln.declared_stations_count} est.</span>
@@ -4576,12 +5320,10 @@
                 corrNameEl.textContent = st.name;
             }
             const edStationId = document.getElementById("editStationId");
-            if (edStationId && edStationId.value !== String(stationId)) {
+            if (edStationId) {
                 edStationId.value = String(stationId);
-                this.loadStationIntoEditor(stationId);
-            } else if (!edStationId) {
-                this.loadStationIntoEditor(stationId);
             }
+            this.loadStationIntoEditor(stationId);
 
             // Sincronizar la línea asociada a la estación en todos los apartados del editor
             const stationLines = Array.isArray(st.lines) ? st.lines : [];
@@ -4665,6 +5407,9 @@
                             <button type="button" class="btn-secondary btn-xs js-open-station-editor" data-station-id="${st.id}">
                                 Editar Estación
                             </button>
+                            <button type="button" class="btn-secondary btn-xs js-auto-align-station-btn" data-station-id="${st.id}" style="color:var(--accent-blue); font-weight:600;" title="Alinear estación a 0°, 45° o 90° con sus tramos conectados">
+                                ⚡ Auto-alinear Recto
+                            </button>
                             ${servedCodes.length >= 10 ? `
                                 <span style="font-size:10px; font-weight:700; color:#b91c1c; background:#fee2e2; padding:3px 6px; border-radius:4px;">
                                     Máx. 10 correspondencias
@@ -4677,6 +5422,9 @@
                             <button type="button" class="btn-secondary btn-xs js-connect-from-station" data-station-id="${st.id}" style="color:var(--accent-blue); font-weight:600;" title="Trazar y unir estaciones estilo MetroMapMaker">
                                 🔗 Trazar Línea
                             </button>
+                            <button type="button" class="btn-secondary btn-xs js-add-corridor-from-station" data-station-id="${st.id}" style="color:var(--accent-blue); font-weight:600;" title="Crear pasillo de correspondencia peatonal con otra estación">
+                                🚶 Pasillo
+                            </button>
                             <button type="button" class="btn-secondary btn-xs js-delete-station-btn" data-station-id="${st.id}" style="color:#ef4444; font-weight:600;">
                                 🗑 Eliminar
                             </button>
@@ -4687,6 +5435,31 @@
                         <span class="section-eyebrow">LÍNEAS ASIGNADAS Y CORRESPONDENCIAS (${servedCodes.length}/10)</span>
                         ${linesListHtml}
                     </div>
+                    ${(() => {
+                        const corridors = NetworkStore.getCorridorsForStation(st.id);
+                        if (!corridors || corridors.length === 0) return "";
+                        return `
+                            <div style="margin-top:10px;">
+                                <span class="section-eyebrow">PASILLOS DE CORRESPONDENCIA PEATONAL (${corridors.length})</span>
+                                ${corridors.map(c => {
+                                    const otherId = (c.from_station_id === st.id) ? c.to_station_id : c.from_station_id;
+                                    const otherSt = NetworkStore.stationsById.get(otherId);
+                                    const otherName = otherSt ? otherSt.name : `Estación #${otherId}`;
+                                    return `
+                                        <div class="corridor-item" style="display:flex; align-items:center; justify-content:space-between; padding:5px 8px; background:var(--bg-subtle); border:1px solid var(--border-hairline); border-radius:4px; margin-bottom:4px;">
+                                            <div style="display:flex; align-items:center; gap:6px;">
+                                                <span style="font-size:12px;">🚶</span>
+                                                <span style="font-size:11px; font-weight:600;">⇄ ${escapeHtml(otherName)} (${c.distance_meters || 120}m · ~${c.walking_minutes || 2}min)</span>
+                                            </div>
+                                            <button type="button" class="btn-secondary btn-xs js-delete-corridor-btn" data-corridor-id="${c.id}" style="color:#ef4444; padding:2px 7px; font-size:11px;" title="Eliminar pasillo">
+                                                ✕ Quitar
+                                            </button>
+                                        </div>
+                                    `;
+                                }).join("")}
+                            </div>
+                        `;
+                    })()}
 
                     <div>
                         <span class="section-eyebrow">TERMINAL DE LÍNEA (ICONO CON NÚMERO AL LADO)</span>
@@ -5221,6 +5994,70 @@
             }
         },
 
+        async autoAlignStation(stationId) {
+            const stId = Number(stationId);
+            const st = NetworkStore.stationsById.get(stId);
+            if (!st) {
+                showToast("Estación no encontrada");
+                return;
+            }
+
+            const [newX, newY] = SchematicMapEngine.getStationAutoAlignedCoords(st, st.x, st.y, null);
+            if (newX === st.x && newY === st.y) {
+                showToast(`✓ "${st.name}" ya se encuentra perfectamente alineada a 0° / 45° / 90°`);
+                return;
+            }
+
+            const oldX = st.x;
+            const oldY = st.y;
+            st.x = newX;
+            st.y = newY;
+            const lat = Number((19.420000 + ((1860.0 - newY) / 54.0) / 111.195080).toFixed(4));
+            const lng = Number((-99.140000 + ((newX - 2120.0) / 54.0) / 104.868820).toFixed(4));
+            st.lat = lat;
+            st.lng = lng;
+
+            const editX = document.getElementById("editStationX");
+            const editY = document.getElementById("editStationY");
+            if (editX) editX.value = newX;
+            if (editY) editY.value = newY;
+
+            try {
+                const res = await ApiClient.post(`/api/stations/${stId}/update/`, {
+                    id: stId,
+                    name: st.name,
+                    x: newX,
+                    y: newY,
+                    lat,
+                    lng,
+                    infrastructure_type: st.infrastructure_type,
+                    operational_status: st.operational_status,
+                    depth_meters: st.depth_meters,
+                    platform_type: st.platform_type,
+                    platform_count: st.platform_count,
+                    has_psd: st.has_psd,
+                    is_premium_stop: st.is_premium_stop,
+                    icon_tags: st.icon_tags,
+                    terminal_lines: st.terminal_lines,
+                    lines: st.lines,
+                    custom_color: st.custom_color,
+                    is_transfer: st.is_transfer
+                });
+
+                await refreshNetworkDataAndRender(false);
+                this.selectStation(stId);
+                this.loadStationIntoEditor(stId);
+                const msgMode = res.server ? "" : " (guardado localmente)";
+                showToast(`⚡ "${st.name}" auto-alineada a 0° / 45° / 90° [X: ${newX}, Y: ${newY}]${msgMode}`);
+            } catch (err) {
+                console.error("Error al auto-alinear estación:", err);
+                st.x = oldX;
+                st.y = oldY;
+                SchematicMapEngine.renderTracksAndStations();
+                showToast("Error al auto-alinear estación");
+            }
+        },
+
         seedInitialTicker() {
             const initialMsgs = [
                 ["A", "#00606c", "Circuito Periférico (132,8 km): Sincronizados 16 trenes Ordinarios (150 s) y 8 Expresos Premium (300 s)"],
@@ -5267,6 +6104,19 @@
                     document.getElementById("formEditCorrespondence")?.classList.toggle("hidden", tab !== "correspondence");
                     document.getElementById("sectionEditCorrespondence")?.classList.toggle("hidden", tab !== "correspondence");
                     document.getElementById("formEditCity")?.classList.toggle("hidden", tab !== "city");
+                    if (tab === "city") {
+                        if (!NetworkStore.showCityOutlines) {
+                            NetworkStore.showCityOutlines = true;
+                            const btnCity = document.getElementById("btnToggleCityZones") || document.getElementById("btnEditCityZones");
+                            btnCity?.setAttribute("aria-pressed", "true");
+                            if (NetworkStore.viewMode === "schematic") {
+                                SchematicMapEngine.renderCityOutlines();
+                                SchematicMapEngine.renderEditHandles();
+                            } else if (NetworkStore.viewMode === "geo") {
+                                GeoMapEngine.renderGeoNetwork();
+                            }
+                        }
+                    }
                     if (tab === "correspondence") {
                         this.populateCorrespondenceSubtab();
                     }
@@ -5322,11 +6172,27 @@
 
             // Control deslizante en vivo para el grosor de los trazos de las líneas
             document.getElementById("trackWidthRange")?.addEventListener("input", (e) => {
-                NetworkStore.trackWidthScale = parseFloat(e.target.value) || 1.0;
+                const val = parseFloat(e.target.value) || 1.0;
+                NetworkStore.trackWidthScale = val;
+                const badge = document.getElementById("trackWidthScaleVal");
+                if (badge) badge.textContent = `${val.toFixed(1)}×`;
                 SchematicMapEngine.renderTracksAndStations();
                 if (NetworkStore.viewMode === "geo") {
                     GeoMapEngine.renderGeoNetwork();
                 }
+            });
+
+            // Control deslizante en vivo para ampliar distancias y escalas de las líneas
+            document.getElementById("distanceScaleRange")?.addEventListener("input", (e) => {
+                const val = parseFloat(e.target.value) || 1.0;
+                NetworkStore.setDistanceScale(val);
+                const badge = document.getElementById("distanceScaleVal");
+                if (badge) badge.textContent = `${val.toFixed(2)}×`;
+                SchematicMapEngine.renderTracksAndStations();
+                SchematicMapEngine.renderCityOutlines();
+                SchematicMapEngine.renderCorridors();
+                SchematicMapEngine.renderEditHandles();
+                SchematicMapEngine.syncTrainsDOM();
             });
 
             // Superposición 1:1 del mapa original metro2.png
@@ -5371,9 +6237,17 @@
                 SchematicMapEngine.renderTracksAndStations();
             });
 
-            document.getElementById("btnEditCityZones")?.addEventListener("click", () => {
-                this.switchRightTab("editor");
-                document.querySelector('.ed-subtab[data-edtab="city"]')?.click();
+            const btnCity = document.getElementById("btnToggleCityZones") || document.getElementById("btnEditCityZones");
+            btnCity?.addEventListener("click", () => {
+                NetworkStore.showCityOutlines = !NetworkStore.showCityOutlines;
+                btnCity.setAttribute("aria-pressed", String(NetworkStore.showCityOutlines));
+                if (NetworkStore.viewMode === "schematic") {
+                    SchematicMapEngine.renderCityOutlines();
+                    SchematicMapEngine.renderEditHandles();
+                } else if (NetworkStore.viewMode === "geo") {
+                    GeoMapEngine.renderGeoNetwork();
+                }
+                showToast(NetworkStore.showCityOutlines ? "Cartografía de la ciudad visible" : "Cartografía de la ciudad oculta");
             });
 
             // Minimizar / expandir leyenda
@@ -5423,6 +6297,19 @@
 
             // Clic en tarjeta de línea en el directorio izquierdo
             document.getElementById("linesDirectoryList")?.addEventListener("click", (e) => {
+                const visBtn = e.target.closest(".line-vis-btn");
+                if (visBtn) {
+                    e.stopPropagation();
+                    const code = visBtn.dataset.lineCode;
+                    NetworkStore.toggleLineVisibility(code);
+                    this.renderLinesDirectory();
+                    SchematicMapEngine.renderTracksAndStations();
+                    SchematicMapEngine.renderCorridors();
+                    if (NetworkStore.viewMode === "geo") GeoMapEngine.renderGeoNetwork();
+                    const isNowHidden = NetworkStore.isLineHidden(code);
+                    showToast(isNowHidden ? `Línea ${code} ocultada del mapa` : `Línea ${code} visible`);
+                    return;
+                }
                 const card = e.target.closest(".line-card");
                 if (!card) return;
                 const code = card.dataset.lineCode;
@@ -5539,12 +6426,46 @@
                     return;
                 }
 
+                const addCorrFromStation = e.target.closest(".js-add-corridor-from-station");
+                if (addCorrFromStation) {
+                    const stId = Number(addCorrFromStation.dataset.stationId);
+                    if (stId) {
+                        VisualEditorTools.setTool("add_corridor");
+                        VisualEditorTools.handleStationClickForCorridor(stId);
+                    }
+                    return;
+                }
+
+                const delCorrBtn = e.target.closest(".js-delete-corridor-btn");
+                if (delCorrBtn) {
+                    const corrId = delCorrBtn.dataset.corridorId;
+                    if (corrId && confirm("¿Deseas eliminar este pasillo de correspondencia?")) {
+                        await ApiClient.deleteTransferCorridor(corrId);
+                        NetworkStore.removeTransferCorridor(corrId);
+                        SchematicMapEngine.renderCorridors();
+                        if (NetworkStore.selectedStationId) {
+                            this.selectStation(NetworkStore.selectedStationId);
+                        }
+                        showToast("Pasillo de correspondencia eliminado");
+                    }
+                    return;
+                }
+
                 const openStEdit = e.target.closest(".js-open-station-editor");
                 if (openStEdit) {
                     const stId = Number(openStEdit.dataset.stationId);
                     this.switchRightTab("editor");
                     document.querySelector('.ed-subtab[data-edtab="station"]')?.click();
                     this.loadStationIntoEditor(stId);
+                    return;
+                }
+
+                const autoAlignBtn = e.target.closest(".js-auto-align-station-btn");
+                if (autoAlignBtn) {
+                    const stId = Number(autoAlignBtn.dataset.stationId);
+                    if (stId) {
+                        await this.autoAlignStation(stId);
+                    }
                     return;
                 }
 
@@ -6092,8 +7013,19 @@
                 }
                 await refreshNetworkDataAndRender(false);
                 this.selectStation(Number(stId));
+                this.loadStationIntoEditor(Number(stId));
                 const msgMode = res.server ? "" : " (guardado localmente)";
                 showToast(`✓ Estación, terminales y tags actualizados en la cartografía${msgMode}`);
+            });
+
+            // Botón Auto-alinear Recto en Formulario de Estación
+            document.getElementById("btnAutoAlignStation")?.addEventListener("click", async () => {
+                const stId = Number(document.getElementById("editStationId")?.value || NetworkStore.selectedStationId);
+                if (stId) {
+                    await this.autoAlignStation(stId);
+                } else {
+                    showToast("Selecciona una estación para auto-alinearla");
+                }
             });
 
             // Guardar edición de Polígono de la Ciudad
@@ -6132,10 +7064,32 @@
                 VisualEditorTools.setTool("connect_segment");
             });
             document.getElementById("btnToolAddCorrespondence")?.addEventListener("click", () => {
-                VisualEditorTools.setTool("add_correspondence");
+                VisualEditorTools.setTool("add_corridor");
+            });
+            document.getElementById("btnToolAddCorridor")?.addEventListener("click", () => {
+                VisualEditorTools.setTool("add_corridor");
+            });
+            document.getElementById("btnExpandLineSpacing")?.addEventListener("click", async () => {
+                await VisualEditorTools.expandActiveLineSpacing();
             });
             document.getElementById("btnCancelActiveTool")?.addEventListener("click", () => {
                 VisualEditorTools.cancel();
+            });
+
+            // Clic en capa de pasillos de correspondencia para eliminar en modo edición
+            document.getElementById("svgLayerCorridors")?.addEventListener("click", async (e) => {
+                const delBtn = e.target.closest(".corridor-delete-btn");
+                if (delBtn) {
+                    e.stopPropagation();
+                    const corrId = delBtn.dataset.corridorId;
+                    if (corrId && confirm("¿Deseas eliminar este pasillo de correspondencia?")) {
+                        await ApiClient.deleteTransferCorridor(corrId);
+                        NetworkStore.removeTransferCorridor(corrId);
+                        SchematicMapEngine.renderCorridors();
+                        showToast("Pasillo de correspondencia eliminado");
+                    }
+                    return;
+                }
             });
 
             // Botón Enderezar Línea Activa a 45°/90° (Snap Octilineal estilo MetroMapMaker)
@@ -6437,6 +7391,7 @@
                     closeAllEditorModals();
                     await refreshNetworkDataAndRender();
                     this.selectStation(stId);
+                    this.loadStationIntoEditor(stId);
                     this.populateCorrespondenceSubtab();
                     const addedNames = resData.added_lines && resData.added_lines.length > 0
                         ? resData.added_lines.join(", ")
@@ -6717,10 +7672,14 @@
         }
     }
 
+    let lastRenderedClockSec = -1;
     function updateClockUI() {
+        const curSec = Math.floor(NetworkStore.operationalTimeSec);
+        if (curSec === lastRenderedClockSec) return;
+        lastRenderedClockSec = curSec;
         const el = document.getElementById("operationalClock");
         if (el) {
-            el.textContent = formatSecondsToHHMMSS(NetworkStore.operationalTimeSec);
+            el.textContent = formatSecondsToHHMMSS(curSec);
         }
     }
 

@@ -2,7 +2,7 @@
   "version": 1,
   "created_stations": [
     {
-      "code": "estacion-u-41512056",
+      "code": "estacion-u-e328ada6",
       "name": "Estación Ficticia Parque Oriente",
       "x": 3200.0,
       "y": 1500.0,
@@ -4525,7 +4525,8 @@
     ]
   },
   "deleted_stations": [
-    "5",
-    "test-st-5"
-  ]
+    "test-st-5",
+    "5"
+  ],
+  "transfer_corridors": []
 }

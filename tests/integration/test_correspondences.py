@@ -339,3 +339,47 @@ class TestCorrespondencesEndpoint:
         err_msg = resp_overflow.json()["error"]
         assert "Límite alcanzado" in err_msg or "máximo permitido de 10 correspondencias" in err_msg
         assert not LineStation.objects.filter(station=st_alfa, line__code="11").exists()
+
+    def test_create_and_delete_transfer_corridor_between_distant_stations(self, api_client, minimal_network):
+        """
+        Verifica la creación y eliminación de pasillos de correspondencia peatonal
+        entre estaciones lejanas de distintas líneas.
+        """
+        st_alfa = minimal_network["st_alfa"]
+        st_gamma = minimal_network["st_gamma"]
+
+        # Crear pasillo de correspondencia
+        resp = api_client.post(
+            "/api/corridors/create/",
+            data=json.dumps({"station_id": st_alfa.id, "station_id_2": st_gamma.id}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert "corridor" in data
+        assert data["corridor"]["station1_id"] == st_alfa.id
+        assert data["corridor"]["station2_id"] == st_gamma.id
+        assert data["corridor"]["distance_m"] > 0
+        corr_id = data["corridor"]["id"]
+
+        # Verificar en api_network_data
+        net_resp = api_client.get("/api/network/")
+        assert net_resp.status_code == 200
+        net_data = net_resp.json()
+        assert "transfer_corridors" in net_data
+        assert any(c["id"] == corr_id for c in net_data["transfer_corridors"])
+
+        # Eliminar pasillo
+        del_resp = api_client.post(
+            "/api/corridors/delete/",
+            data=json.dumps({"corridor_id": corr_id}),
+            content_type="application/json",
+        )
+        assert del_resp.status_code == 200
+        assert del_resp.json()["ok"] is True
+
+        # Verificar que ya no está en api_network_data
+        net_resp2 = api_client.get("/api/network/")
+        net_data2 = net_resp2.json()
+        assert not any(c["id"] == corr_id for c in net_data2["transfer_corridors"])

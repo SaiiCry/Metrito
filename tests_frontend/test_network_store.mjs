@@ -24,8 +24,98 @@ function createNetworkStore() {
         alerts: [],
         kpis: {},
         viewMode: "schematic",
+        showLabels: true,
+        showCityOutlines: false,
         isolatedLineCode: null,
         selectedStationId: null,
+        trackWidthScale: 1.0,
+        distanceScale: 1.0,
+        hiddenLines: new Set(),
+        transferCorridors: [],
+        transferCorridorsById: new Map(),
+
+        toggleLineVisibility(code) {
+            const strCode = String(code);
+            if (this.hiddenLines.has(strCode)) {
+                this.hiddenLines.delete(strCode);
+            } else {
+                this.hiddenLines.add(strCode);
+            }
+            return !this.hiddenLines.has(strCode);
+        },
+
+        hideLine(code) {
+            this.hiddenLines.add(String(code));
+        },
+
+        showLine(code) {
+            this.hiddenLines.delete(String(code));
+        },
+
+        isLineHidden(code) {
+            return this.hiddenLines.has(String(code));
+        },
+
+        showAllLines() {
+            this.hiddenLines.clear();
+        },
+
+        hideAllLines() {
+            for (const ln of this.lines) {
+                this.hiddenLines.add(String(ln.code));
+            }
+        },
+
+        setDistanceScale(scale) {
+            const val = Math.max(0.6, Math.min(3.5, Number(scale) || 1.0));
+            this.distanceScale = val;
+            return val;
+        },
+
+        logicalToSvgCoords(x, y) {
+            const dScale = this.distanceScale || 1.0;
+            if (dScale === 1.0) return { x, y };
+            const cx = 2760.0;
+            const cy = 1990.0;
+            return {
+                x: cx + (x - cx) * dScale,
+                y: cy + (y - cy) * dScale
+            };
+        },
+
+        svgToLogicalCoords(svgX, svgY) {
+            const dScale = this.distanceScale || 1.0;
+            if (dScale === 1.0) return { x: svgX, y: svgY };
+            const cx = 2760.0;
+            const cy = 1990.0;
+            return {
+                x: cx + (svgX - cx) / dScale,
+                y: cy + (svgY - cy) / dScale
+            };
+        },
+
+        addTransferCorridor(corridor) {
+            if (!corridor || !corridor.id) return;
+            const idx = this.transferCorridors.findIndex(c => c.id === corridor.id);
+            if (idx >= 0) {
+                this.transferCorridors[idx] = corridor;
+            } else {
+                this.transferCorridors.push(corridor);
+            }
+            this.transferCorridorsById.set(corridor.id, corridor);
+        },
+
+        removeTransferCorridor(corridorId) {
+            this.transferCorridors = this.transferCorridors.filter(c => c.id !== corridorId);
+            this.transferCorridorsById.delete(corridorId);
+        },
+
+        getCorridorsForStation(stationId) {
+            const numId = Number(stationId);
+            return this.transferCorridors.filter(c =>
+                Number(c.from_station_id) === numId || Number(c.to_station_id) === numId
+            );
+        },
 
         async fetchAll(customFetch = globalThis.fetch) {
             const resp = await customFetch("/api/network/");
@@ -54,6 +144,12 @@ function createNetworkStore() {
                 this.stationsById.set(st.id, st);
             }
             this.sortedStations = [...this.stations].sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+            this.transferCorridors = data.transfer_corridors || [];
+            this.transferCorridorsById.clear();
+            for (const tc of this.transferCorridors) {
+                this.transferCorridorsById.set(tc.id, tc);
+            }
         },
 
         getSortedStations() {
@@ -836,5 +932,394 @@ describe("Inserción Topológica Contigua al Conectar Tramo (Sin conectar con la
             assert.equal(stopObj.waypoints.length, 1);
         }
         assert.equal(stopObj.waypoints.length, 1);
+    });
+});
+
+describe("Autoalineado de Estaciones a Nivel Perfecto y Snap Estricto (0°, 45°, 90°, 135°, ...)", () => {
+    function snapPointOctilinear(anchor, target) {
+        const ax = Math.round(Number(anchor[0] !== undefined ? anchor[0] : anchor.x) * 2) / 2;
+        const ay = Math.round(Number(anchor[1] !== undefined ? anchor[1] : anchor.y) * 2) / 2;
+        const tx = Number(target[0] !== undefined ? target[0] : target.x);
+        const ty = Number(target[1] !== undefined ? target[1] : target.y);
+        const dx = tx - ax;
+        const dy = ty - ay;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1.0) return [ax, ay];
+
+        let deg = (Math.atan2(dy, dx) * 180 / Math.PI) % 360;
+        if (deg < 0) deg += 360;
+        const oct = Math.round(deg / 45) % 8;
+
+        const dOrtho = Math.round(dist * 2) / 2;
+        const dDiag = Math.round(((Math.abs(dx) + Math.abs(dy)) / 2) * 2) / 2;
+
+        switch (oct) {
+            case 0: return [ax + dOrtho, ay];
+            case 1: return [ax + dDiag, ay + dDiag];
+            case 2: return [ax, ay + dOrtho];
+            case 3: return [ax - dDiag, ay + dDiag];
+            case 4: return [ax - dOrtho, ay];
+            case 5: return [ax - dDiag, ay - dDiag];
+            case 6: return [ax, ay - dOrtho];
+            case 7: return [ax + dDiag, ay - dDiag];
+            default: return [Math.round(tx * 2) / 2, Math.round(ty * 2) / 2];
+        }
+    }
+
+    function getStationAutoAlignedCoords(st, rawX, rawY, neighbors, snapThreshold = null) {
+        const rx = Number(rawX);
+        const ry = Number(rawY);
+        if (!neighbors || neighbors.length === 0) {
+            return [Math.round(rx * 2) / 2, Math.round(ry * 2) / 2];
+        }
+
+        const candidates = [];
+        const addCandidate = (cx, cy) => {
+            const x = Math.round(Number(cx) * 2) / 2;
+            const y = Math.round(Number(cy) * 2) / 2;
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+            if (!candidates.some(c => c.x === x && c.y === y)) {
+                candidates.push({ x, y });
+            }
+        };
+
+        for (const nb of neighbors) {
+            const octPt = snapPointOctilinear([nb.x, nb.y], [rx, ry]);
+            addCandidate(octPt[0], octPt[1]);
+            addCandidate(nb.x, ry);
+            addCandidate(rx, nb.y);
+        }
+
+        for (let i = 0; i < neighbors.length; i++) {
+            for (let j = i + 1; j < neighbors.length; j++) {
+                const n1 = neighbors[i];
+                const n2 = neighbors[j];
+
+                addCandidate(n2.x, n1.y);
+                addCandidate(n1.x, n2.y);
+
+                if (Math.abs(n1.y - n2.y) <= 12.0) {
+                    const midY = (n1.y + n2.y) / 2;
+                    addCandidate(rx, midY);
+                    addCandidate((n1.x + n2.x) / 2, midY);
+                }
+
+                if (Math.abs(n1.x - n2.x) <= 12.0) {
+                    const midX = (n1.x + n2.x) / 2;
+                    addCandidate(midX, ry);
+                    addCandidate(midX, (n1.y + n2.y) / 2);
+                }
+
+                const ndx = n2.x - n1.x;
+                const ndy = n2.y - n1.y;
+                if (Math.abs(Math.abs(ndx) - Math.abs(ndy)) <= 12.0 && Math.abs(ndx) > 6.0) {
+                    const m = (ndx * ndy > 0) ? 1 : -1;
+                    const projX = (rx + n1.x + m * (ry - n1.y)) / 2;
+                    const projY = n1.y + m * (projX - n1.x);
+                    addCandidate(projX, projY);
+                    addCandidate((n1.x + n2.x) / 2, (n1.y + n2.y) / 2);
+                }
+            }
+        }
+
+        const isOctilinear = (x1, y1, x2, y2) => {
+            const dx = Math.abs(x1 - x2);
+            const dy = Math.abs(y1 - y2);
+            if (dx < 0.001 || dy < 0.001) return true;
+            return Math.abs(dx - dy) < 0.001;
+        };
+
+        let bestCandidate = null;
+        let bestScore = -Infinity;
+
+        for (const cand of candidates) {
+            const dist = Math.hypot(cand.x - rx, cand.y - ry);
+            if (snapThreshold !== null && dist > snapThreshold) continue;
+
+            let alignedNeighborsCount = 0;
+            for (const nb of neighbors) {
+                if (isOctilinear(cand.x, cand.y, nb.x, nb.y)) {
+                    alignedNeighborsCount++;
+                }
+            }
+
+            const score = (alignedNeighborsCount * 1000) - dist;
+            if (score > bestScore) {
+                bestScore = score;
+                bestCandidate = cand;
+            }
+        }
+
+        if (bestCandidate) return [bestCandidate.x, bestCandidate.y];
+        return [Math.round(rx * 2) / 2, Math.round(ry * 2) / 2];
+    }
+
+    it("garantiza que |dx| === |dy| de forma exacta en coordenadas con decimales a 45°", () => {
+        const anchor = [100.5, 200.5];
+        const target = [182.3, 279.7]; // Cerca de 45° (SE)
+        const [x, y] = snapPointOctilinear(anchor, target);
+
+        const dx = Math.abs(x - anchor[0]);
+        const dy = Math.abs(y - anchor[1]);
+        assert.equal(dx, dy, "El delta X debe ser exactamente igual al delta Y en 45°");
+        assert.equal(Number.isInteger(x * 2), true, "La coordenada X debe caer en paso 0.5");
+        assert.equal(Number.isInteger(y * 2), true, "La coordenada Y debe caer en paso 0.5");
+    });
+
+    it("auto-alinea a nivel perfecto una estación entre dos vecinos horizontales (dy = 0)", () => {
+        const n1 = { id: 1, x: 100.0, y: 300.0 };
+        const n2 = { id: 2, x: 250.0, y: 300.0 };
+        const st = { id: 3, x: 180.0, y: 304.5 }; // Ligeramente desalineada en Y por 4.5px
+
+        const [newX, newY] = getStationAutoAlignedCoords(st, st.x, st.y, [n1, n2], null);
+        assert.equal(newY, 300.0, "La estación debe quedar exactamente a Y=300");
+        assert.equal(newX, 180.0, "Conserva su posición en el segmento");
+        assert.equal(newY - n1.y, 0, "Pendiente horizontal perfecta con n1");
+        assert.equal(newY - n2.y, 0, "Pendiente horizontal perfecta con n2");
+    });
+
+    it("auto-alinea a nivel perfecto una estación entre dos vecinos verticales (dx = 0)", () => {
+        const n1 = { id: 1, x: 400.0, y: 100.0 };
+        const n2 = { id: 2, x: 400.0, y: 300.0 };
+        const st = { id: 3, x: 403.5, y: 200.0 }; // Ligeramente desalineada en X por 3.5px
+
+        const [newX, newY] = getStationAutoAlignedCoords(st, st.x, st.y, [n1, n2], null);
+        assert.equal(newX, 400.0, "La estación debe quedar exactamente a X=400");
+        assert.equal(newY, 200.0);
+        assert.equal(newX - n1.x, 0, "Pendiente vertical perfecta con n1");
+        assert.equal(newX - n2.x, 0, "Pendiente vertical perfecta con n2");
+    });
+
+    it("auto-alinea a nivel perfecto una estación en una esquina ortogonal a 90° (L-bend)", () => {
+        const n1 = { id: 1, x: 100.0, y: 200.0 }; // Al oeste
+        const n2 = { id: 2, x: 250.0, y: 350.0 }; // Al sur
+        const st = { id: 3, x: 252.0, y: 203.0 }; // Cerca de la esquina (250, 200)
+
+        const [newX, newY] = getStationAutoAlignedCoords(st, st.x, st.y, [n1, n2], null);
+        assert.equal(newX, 250.0, "Debe alinearse en X con n2");
+        assert.equal(newY, 200.0, "Debe alinearse en Y con n1");
+        // Con n1: Y es igual (horizontal puro, dy = 0)
+        assert.equal(newY - n1.y, 0);
+        // Con n2: X es igual (vertical puro, dx = 0)
+        assert.equal(newX - n2.x, 0);
+    });
+
+    it("auto-alinea a nivel perfecto una estación en una diagonal collinear a 45°", () => {
+        const n1 = { id: 1, x: 100.0, y: 100.0 };
+        const n2 = { id: 2, x: 300.0, y: 300.0 };
+        const st = { id: 3, x: 201.0, y: 198.0 }; // Ligeramente desalineada de la diagonal x = y
+
+        const [newX, newY] = getStationAutoAlignedCoords(st, st.x, st.y, [n1, n2], null);
+        assert.equal(Math.abs(newX - n1.x), Math.abs(newY - n1.y), "Debe satisfacer |dx| === |dy| con n1");
+        assert.equal(Math.abs(newX - n2.x), Math.abs(newY - n2.y), "Debe satisfacer |dx| === |dy| con n2");
+        assert.equal(newX, newY, "X e Y deben ser idénticos en la diagonal a 45°");
+        assert.equal(newX, 199.5);
+        assert.equal(newY, 199.5);
+    });
+});
+
+
+describe("Cartografía del Mapa - Ocultamiento por Defecto y Renderizado Condicional", () => {
+    it("NetworkStore inicia con showCityOutlines desactivado por defecto (false)", () => {
+        const store = createNetworkStore();
+        assert.equal(store.showCityOutlines, false, "La cartografía de fondo debe estar deshabilitada por defecto");
+    });
+
+    it("renderCityOutlines no genera elementos en el SVG si showCityOutlines es false", () => {
+        const store = createNetworkStore();
+        store.showCityOutlines = false;
+        store.cityOutlines = [
+            { id: 1, name: "Meseta Central Metropolitana", polygon_points: [[100, 100], [200, 100], [200, 200]] },
+            { id: 2, name: "Terminal Aéreo Sur Álvarez Morisot y Ciudad Universitaria", polygon_points: [[300, 300], [400, 300], [400, 400]] }
+        ];
+
+        const mockLayer = { innerHTML: "previous-content" };
+        function renderOutlines(g, storeRef) {
+            if (!g) return;
+            if (!storeRef.showCityOutlines) {
+                g.innerHTML = "";
+                return;
+            }
+            g.innerHTML = storeRef.cityOutlines.map(z => `<polygon data-zone-id="${z.id}" />`).join("");
+        }
+
+        renderOutlines(mockLayer, store);
+        assert.equal(mockLayer.innerHTML, "", "La capa SVG de zonas cartográficas debe limpiarse a vacío");
+
+        store.showCityOutlines = true;
+        renderOutlines(mockLayer, store);
+        assert.ok(mockLayer.innerHTML.includes('data-zone-id="1"'), "Debe renderizar la zona 1 al activarse");
+        assert.ok(mockLayer.innerHTML.includes('data-zone-id="2"'), "Debe renderizar la zona 2 al activarse");
+    });
+
+    it("la edición de una zona en subtab city activa automáticamente la cartografía si estaba oculta", () => {
+        const store = createNetworkStore();
+        store.showCityOutlines = false;
+
+        function onSubtabSwitch(tab, storeRef) {
+            if (tab === "city") {
+                if (!storeRef.showCityOutlines) {
+                    storeRef.showCityOutlines = true;
+                }
+            }
+        }
+
+        onSubtabSwitch("station", store);
+        assert.equal(store.showCityOutlines, false);
+
+        onSubtabSwitch("city", store);
+        assert.equal(store.showCityOutlines, true, "Al entrar al editor de ciudad debe activar la visibilidad de cartografía");
+    });
+});
+
+describe("Ocultar y Mostrar Líneas Individuales (Visibilidad Selectiva)", () => {
+    it("permite ocultar, mostrar y alternar visibilidad de líneas con persistencia en el Set", () => {
+        const store = createNetworkStore();
+        store.lines = [{ code: "1", name: "Línea 1" }, { code: "2", name: "Línea 2" }, { code: "A", name: "Línea A" }];
+
+        assert.equal(store.isLineHidden("1"), false);
+        assert.equal(store.isLineHidden("2"), false);
+
+        store.hideLine("1");
+        assert.equal(store.isLineHidden("1"), true);
+        assert.equal(store.isLineHidden("2"), false);
+
+        // Toggle vuelve a mostrar
+        const visibleNow = store.toggleLineVisibility("1");
+        assert.equal(visibleNow, true);
+        assert.equal(store.isLineHidden("1"), false);
+
+        // Toggle oculta
+        const visibleAgain = store.toggleLineVisibility("1");
+        assert.equal(visibleAgain, false);
+        assert.equal(store.isLineHidden("1"), true);
+
+        // Ocultar todas y mostrar todas
+        store.hideAllLines();
+        assert.equal(store.isLineHidden("1"), true);
+        assert.equal(store.isLineHidden("2"), true);
+        assert.equal(store.isLineHidden("A"), true);
+
+        store.showAllLines();
+        assert.equal(store.isLineHidden("1"), false);
+        assert.equal(store.isLineHidden("2"), false);
+        assert.equal(store.isLineHidden("A"), false);
+    });
+
+    it("evalúa visibilidad compuesta: estaciones compartidas permanecen visibles si al menos una de sus líneas es visible", () => {
+        const store = createNetworkStore();
+        store.lines = [{ code: "1" }, { code: "2" }];
+        const stShared = { id: 10, name: "Pino Suárez", lines: ["1", "2"] };
+        const stExclusive = { id: 20, name: "Merced", lines: ["1"] };
+
+        function isStationVisible(st, storeRef) {
+            if (!st.lines || st.lines.length === 0) return true;
+            return st.lines.some(code => !storeRef.isLineHidden(code));
+        }
+
+        assert.equal(isStationVisible(stShared, store), true);
+        assert.equal(isStationVisible(stExclusive, store), true);
+
+        store.hideLine("1");
+        // Pino Suárez sigue visible porque Línea 2 no está oculta
+        assert.equal(isStationVisible(stShared, store), true);
+        // Merced queda oculta porque su única línea está oculta
+        assert.equal(isStationVisible(stExclusive, store), false);
+
+        store.hideLine("2");
+        // Ahora ambas están ocultas
+        assert.equal(isStationVisible(stShared, store), false);
+    });
+});
+
+describe("Escalas y Distancias de Líneas (distanceScale & trackWidthScale)", () => {
+    it("permite ajustar trackWidthScale entre 0.4x y 3.5x para grosores de líneas expandidos", () => {
+        const store = createNetworkStore();
+        assert.equal(store.trackWidthScale, 1.0);
+
+        store.trackWidthScale = 2.5;
+        assert.equal(store.trackWidthScale, 2.5);
+
+        const baseMetroWidth = 15.8;
+        const scaledWidth = baseMetroWidth * store.trackWidthScale;
+        assert.equal(scaledWidth, 39.5);
+    });
+
+    it("permite ajustar distanceScale y transforma coordenadas de forma simétrica e invertible", () => {
+        const store = createNetworkStore();
+        assert.equal(store.distanceScale, 1.0);
+
+        // A escala 1.0, las coordenadas lógicas y SVG son idénticas
+        const p1 = store.logicalToSvgCoords(2120, 1860);
+        assert.equal(p1.x, 2120);
+        assert.equal(p1.y, 1860);
+        const inv1 = store.svgToLogicalCoords(p1.x, p1.y);
+        assert.equal(inv1.x, 2120);
+        assert.equal(inv1.y, 1860);
+
+        // A escala 1.5x (distancias ampliadas)
+        store.setDistanceScale(1.5);
+        assert.equal(store.distanceScale, 1.5);
+
+        const logicalPt = { x: 3000, y: 2200 };
+        const svgPt = store.logicalToSvgCoords(logicalPt.x, logicalPt.y);
+        // Debe expandirse respecto al centroide (2760, 1990)
+        assert.ok(svgPt.x > logicalPt.x, "X debe expandirse hacia afuera");
+        assert.ok(svgPt.y > logicalPt.y, "Y debe expandirse hacia afuera");
+
+        // El mapeo inverso debe devolver con precisión micrométrica las coordenadas lógicas originales
+        const recovered = store.svgToLogicalCoords(svgPt.x, svgPt.y);
+        assert.ok(Math.abs(recovered.x - logicalPt.x) < 0.0001, "X inversa debe coincidir");
+        assert.ok(Math.abs(recovered.y - logicalPt.y) < 0.0001, "Y inversa debe coincidir");
+    });
+});
+
+describe("Pasillos de Correspondencia entre Estaciones Distantes", () => {
+    it("administra pasillos de correspondencia con distancias en metros y tiempos de caminata", () => {
+        const store = createNetworkStore();
+        const corridor = {
+            id: "tc_101_202",
+            from_station_id: 101,
+            to_station_id: 202,
+            distance_meters: 180,
+            walking_minutes: 3.0,
+            waypoints: [[2800, 2000]],
+            status: "active"
+        };
+
+        store.addTransferCorridor(corridor);
+        assert.equal(store.transferCorridors.length, 1);
+        assert.equal(store.transferCorridorsById.get("tc_101_202"), corridor);
+
+        // Búsqueda por estación conectada
+        const corridorsFor101 = store.getCorridorsForStation(101);
+        assert.equal(corridorsFor101.length, 1);
+        assert.equal(corridorsFor101[0].id, "tc_101_202");
+
+        const corridorsFor202 = store.getCorridorsForStation(202);
+        assert.equal(corridorsFor202.length, 1);
+
+        const corridorsForOther = store.getCorridorsForStation(999);
+        assert.equal(corridorsForOther.length, 0);
+
+        // Eliminación de pasillo
+        store.removeTransferCorridor("tc_101_202");
+        assert.equal(store.transferCorridors.length, 0);
+        assert.equal(store.transferCorridorsById.has("tc_101_202"), false);
+    });
+
+    it("hidrata transfer_corridors al recibir datos topológicos de la API", () => {
+        const store = createNetworkStore();
+        const mockApiData = {
+            lines: [{ code: "1", stops: [] }],
+            stations: [{ id: 1, name: "Estación A" }, { id: 2, name: "Estación B" }],
+            transfer_corridors: [
+                { id: "tc_1_2", from_station_id: 1, to_station_id: 2, distance_meters: 120, walking_minutes: 2.0 }
+            ]
+        };
+
+        store.hydrate(mockApiData);
+        assert.equal(store.transferCorridors.length, 1);
+        assert.equal(store.transferCorridorsById.get("tc_1_2").distance_meters, 120);
     });
 });

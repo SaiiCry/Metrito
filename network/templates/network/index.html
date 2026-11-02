@@ -178,16 +178,22 @@
                 <button type="button" class="map-tool-btn" id="btnToggleLabels" aria-pressed="true" title="Mostrar / ocultar nombres de estaciones">
                     Etiquetas
                 </button>
-                <button type="button" class="map-tool-btn" id="btnEditCityZones" title="Editar polígonos y forma geográfica de la ciudad">
-                    Polígonos Ciudad
+                <button type="button" class="map-tool-btn" id="btnToggleCityZones" aria-pressed="false" title="Mostrar / ocultar zonas cartográficas (mesetas, aeropuerto, reservas)">
+                    Cartografía
                 </button>
                 <button type="button" class="map-tool-btn" id="btnQuickAddStation" title="Crear y colocar una nueva estación en la red" style="color:var(--accent-blue); font-weight:600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
                     <span>+ Estación</span>
                 </button>
-                <div class="track-width-control" title="Ajustar grosor visual de los trazos de las líneas">
-                    <label for="trackWidthRange">Grosor</label>
-                    <input type="range" id="trackWidthRange" min="0.7" max="1.8" step="0.1" value="1.0">
+                <div class="track-width-control" title="Ajustar grosor visual y escala de los trazos de las líneas">
+                    <label for="trackWidthRange">Escala</label>
+                    <input type="range" id="trackWidthRange" min="0.4" max="3.5" step="0.1" value="1.0">
+                    <span class="tabular scale-badge" id="trackWidthScaleVal">1.0×</span>
+                </div>
+                <div class="distance-scale-control" title="Ampliar distancias y separación entre estaciones a lo largo de las líneas">
+                    <label for="distanceScaleRange">Distancias</label>
+                    <input type="range" id="distanceScaleRange" min="0.8" max="2.5" step="0.05" value="1.0">
+                    <span class="tabular scale-badge" id="distanceScaleVal">1.0×</span>
                 </div>
             </div>
 
@@ -217,6 +223,14 @@
                     <button type="button" class="ed-tool-btn" id="btnToolAddCorrespondence" title="Agregar correspondencia / transbordo directo entre estaciones">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M9 21H4v-5M15 9l6-6M4 4l5 5"/></svg>
                         <span>⇄ Correspondencia</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn" id="btnToolAddCorridor" title="Tender pasillo de correspondencia peatonal entre dos estaciones lejanas">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12h16M15 7l5 5-5 5M9 17l-5-5 5-5"/><circle cx="4" cy="12" r="2.5" fill="currentColor"/><circle cx="20" cy="12" r="2.5" fill="currentColor"/></svg>
+                        <span>⇄ Pasillo</span>
+                    </button>
+                    <button type="button" class="ed-tool-btn" id="btnExpandLineSpacing" title="Ampliar distancias entre estaciones de la línea activa para mayor separación">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/></svg>
+                        <span>⚡ Ampliar Distancias</span>
                     </button>
                     <button type="button" class="ed-tool-btn" id="btnStraightenActiveLine" title="Enderezar trazos de la línea activa a 45°/90° (Snap Octilineal estilo MetroMapMaker)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12h16M12 4v16"/><circle cx="12" cy="12" r="3"/></svg>
@@ -315,6 +329,8 @@
                     <g id="svgLayerTracks"></g>
                     <!-- Capa 3B: Áreas interactivas para insertar/moldear codos sobre cualquier trazo en Modo Edición -->
                     <g id="svgLayerTrackHits"></g>
+                    <!-- Capa 3C: Pasillos de correspondencia peatonal entre estaciones distantes -->
+                    <g id="svgLayerCorridors"></g>
                     <!-- Capa 4: Estaciones (828 Metro + 171 Autobuses Articulados) y correspondencias -->
                     <g id="svgLayerStations"></g>
                     <!-- Capa 4A: Iconos con el número/código de línea al lado de cada estación terminal -->
@@ -699,6 +715,11 @@
                             <label for="editStationDepth">Cota / Prof. (m)</label>
                             <input type="number" id="editStationDepth" class="form-control tabular" step="0.5" required>
                         </div>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <button type="button" id="btnAutoAlignStation" class="btn-secondary btn-block" style="display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600; color:var(--accent-blue); padding:7px 10px;" title="Alinear estación a 0°, 45° o 90° con sus tramos conectados">
+                            <span>⚡ Auto-alinear Recto (0° / 45° / 90°)</span>
+                        </button>
                     </div>
                     <div class="form-row-2">
                         <div class="form-group">

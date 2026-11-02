@@ -2351,3 +2351,147 @@ body.tool-active-add_correspondence #metroSchematicSvg {
     border-color: var(--primary, #0052ff);
     box-shadow: 0 0 0 2px rgba(0, 82, 255, 0.2);
 }
+
+
+/* =========================================================================
+   Controles de Escala de Distancia, Ocultamiento de Línea y Pasillos
+   ========================================================================= */
+
+.distance-scale-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-hairline);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.distance-scale-control label {
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+}
+
+.distance-scale-control input[type="range"] {
+    width: 64px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
+.scale-badge {
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 28px;
+    color: var(--text-primary);
+}
+
+.line-vis-btn {
+    background: none;
+    border: none;
+    padding: 3px;
+    margin: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.line-vis-btn:hover {
+    color: var(--accent-primary);
+    background: rgba(0, 85, 164, 0.09);
+}
+
+.line-vis-btn:active {
+    transform: scale(0.92);
+}
+
+.line-vis-btn.is-hidden {
+    color: #ef4444;
+    opacity: 0.8;
+}
+
+.line-vis-btn.is-hidden:hover {
+    opacity: 1;
+    color: var(--accent-primary);
+}
+
+.line-card.line-hidden {
+    opacity: 0.42;
+    filter: grayscale(0.65);
+    border-style: dashed;
+}
+
+.line-card.line-hidden .line-badge {
+    opacity: 0.6;
+}
+
+.line-card-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Pasillos de correspondencia peatonal en SVG */
+.svg-transfer-corridor {
+    cursor: pointer;
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.svg-transfer-corridor:hover .corridor-casing {
+    stroke: var(--accent-primary, #0055A4);
+    filter: drop-shadow(0 0 6px rgba(0, 85, 164, 0.45));
+}
+
+.svg-transfer-corridor:hover .corridor-walkway {
+    stroke: var(--accent-primary, #0055A4);
+}
+
+.svg-transfer-corridor .corridor-badge {
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.svg-transfer-corridor:hover .corridor-badge {
+    transform: scale(1.12);
+}
+
+body.tool-active-add_corridor #schematicViewport {
+    cursor: crosshair;
+}
+
+.corridor-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    font-size: 11.5px;
+}
+
+.corridor-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.corridor-item-target {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.corridor-item-meta {
+    font-size: 10px;
+    color: var(--text-secondary);
+}

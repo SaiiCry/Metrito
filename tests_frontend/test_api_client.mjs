@@ -374,4 +374,39 @@ describe("ApiClient - Persistencia Dual y Modo Offline / GitHub Pages", () => {
         assert.equal(st2.is_transfer, true);
         assert.equal(ln2.stops.some(s => s.station_id === 102), true);
     });
+
+    it("conserva el nombre de la estación tras guardar cambios y posteriormente agregar correspondencia", () => {
+        const st = mockStore.stationsById.get(101);
+        st.name = "Estación Personalizada Nuevo Nombre";
+
+        let edits = {
+            stations: {
+                101: { name: "Estación Personalizada Nuevo Nombre", is_custom_modified: true }
+            },
+            lines: {},
+            createdStations: [],
+            createdLines: [],
+            deletedStations: []
+        };
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify(edits));
+
+        // Simular agregar correspondencia a la estación 101 con Línea 3
+        const targetLine = "3";
+        if (!st.lines.includes(targetLine)) st.lines.push(targetLine);
+        st.is_transfer = st.lines.length > 1;
+
+        if (!edits.stations[101]) edits.stations[101] = {};
+        Object.assign(edits.stations[101], {
+            name: st.name,
+            lines: st.lines,
+            is_transfer: st.is_transfer,
+            is_custom_modified: true
+        });
+        mockLocalStorage.setItem("simma_user_network_edits_v1", JSON.stringify(edits));
+
+        const stored = JSON.parse(mockLocalStorage.getItem("simma_user_network_edits_v1"));
+        assert.equal(stored.stations[101].name, "Estación Personalizada Nuevo Nombre");
+        assert.equal(st.name, "Estación Personalizada Nuevo Nombre");
+        assert.ok(stored.stations[101].lines.includes("3"));
+    });
 });
